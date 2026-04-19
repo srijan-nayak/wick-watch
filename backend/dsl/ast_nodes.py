@@ -30,14 +30,21 @@ class NumberLiteral:
     value: float
 
 
-ValueNode = Union[CandleField, IndicatorCall, NumberLiteral]
+@dataclass
+class BinaryArith:
+    left: 'ValueNode'
+    op: str   # '+' | '-' | '*' | '/'
+    right: 'ValueNode'
+
+
+ValueNode = Union[CandleField, IndicatorCall, NumberLiteral, BinaryArith]
 
 
 @dataclass
 class Comparison:
-    left: ValueNode
+    left: 'ValueNode'
     op: str
-    right: ValueNode
+    right: 'ValueNode'
 
 
 @dataclass

@@ -12,6 +12,7 @@ class TokenType(Enum):
     RPAREN      = auto()   # )
     COMMA       = auto()   # ,
     OP          = auto()   # < > <= >= != =
+    ARITH       = auto()   # + - * /
     NUMBER      = auto()   # 14, 2.0
     NEWLINE     = auto()
     EOF         = auto()
@@ -40,6 +41,7 @@ _RULES: list[tuple[str, TokenType | None]] = [
     (r"c\d+",            TokenType.CANDLE_REF),
     (r"<=|>=|!=",        TokenType.OP),
     (r"[<>=]",           TokenType.OP),
+    (r"[+\-*/]",         TokenType.ARITH),
     (r"\d+\.\d+",        TokenType.NUMBER),
     (r"\d+",             TokenType.NUMBER),
     (r"[A-Za-z_]\w*",   TokenType.IDENTIFIER),

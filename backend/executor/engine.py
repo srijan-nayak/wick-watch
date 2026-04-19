@@ -3,7 +3,7 @@ import math
 import pandas as pd
 from dsl.ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
-    CandleField, IndicatorCall, NumberLiteral, ValueNode,
+    CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
 )
 from dsl.compiler import CompiledPattern
 from indicators.registry import INDICATORS
@@ -84,6 +84,17 @@ def _eval_value(node: ValueNode, df: pd.DataFrame, ws: int) -> float:
         return float(row[node.field])
     if isinstance(node, IndicatorCall):
         return _eval_indicator(node, df)
+    if isinstance(node, BinaryArith):
+        left = _eval_value(node.left, df, ws)
+        right = _eval_value(node.right, df, ws)
+        if node.op == '+': return left + right
+        if node.op == '-': return left - right
+        if node.op == '*': return left * right
+        if node.op == '/':
+            if right == 0:
+                raise EvalError("Division by zero in arithmetic expression")
+            return left / right
+        raise EvalError(f"Unknown arithmetic operator: {node.op!r}")
     raise EvalError(f"Unknown value node type: {type(node)}")
 
 

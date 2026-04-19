@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from .ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
-    CandleField, IndicatorCall, NumberLiteral, ValueNode,
+    CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
 )
 from indicators.registry import INDICATORS
 
@@ -74,6 +74,9 @@ def _collect(node: BoolNode, calls: list[IndicatorCall], _) -> None:
 def _collect_value(node: ValueNode, calls: list[IndicatorCall]) -> None:
     if isinstance(node, IndicatorCall):
         calls.append(node)
+    elif isinstance(node, BinaryArith):
+        _collect_value(node.left, calls)
+        _collect_value(node.right, calls)
 
 
 def _collect_indices(node: BoolNode, indices: list[int]) -> None:
@@ -93,3 +96,6 @@ def _collect_value_indices(node: ValueNode, indices: list[int]) -> None:
     elif isinstance(node, IndicatorCall):
         candle = node.params.get("candle", 1)
         indices.append(int(candle))
+    elif isinstance(node, BinaryArith):
+        _collect_value_indices(node.left, indices)
+        _collect_value_indices(node.right, indices)

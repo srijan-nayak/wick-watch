@@ -1,7 +1,7 @@
 from __future__ import annotations
 from .ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
-    CandleField, IndicatorCall, NumberLiteral, ValueNode,
+    CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
 )
 from indicators.registry import INDICATORS, Param
 
@@ -32,6 +32,9 @@ def _validate_value(node: ValueNode) -> None:
         return
     if isinstance(node, IndicatorCall):
         _validate_indicator(node)
+    elif isinstance(node, BinaryArith):
+        _validate_value(node.left)
+        _validate_value(node.right)
 
 
 def _validate_indicator(call: IndicatorCall) -> None:
