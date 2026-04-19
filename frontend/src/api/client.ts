@@ -151,11 +151,9 @@ export const searchInstruments = (exchange: string, query: string) =>
 
 export const runBacktest = (body: {
   pattern_id: number;
-  instrument_token: number;
-  symbol: string;
+  ticker_id: number;
   from_date: string;
   to_date: string;
-  interval: string;
 }) => request<BacktestResult>('/api/backtest', { method: 'POST', body: JSON.stringify(body) });
 
 // ─── Live ─────────────────────────────────────────────────────────────────────

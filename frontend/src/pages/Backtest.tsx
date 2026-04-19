@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { getPatterns, runBacktest } from '../api/client';
-import type { Candle, Pattern } from '../api/client';
+import { getPatterns, getTickers, runBacktest } from '../api/client';
+import type { Candle, Pattern, Ticker } from '../api/client';
 import { useStore } from '../store';
 import CandleChart from '../components/CandleChart';
 
@@ -14,35 +14,24 @@ const thirtyDaysAgo = () => {
 
 interface BacktestForm {
   pattern_id: string;
-  instrument_token: string;
-  symbol: string;
+  ticker_id: string;
   from_date: string;
   to_date: string;
-  interval: string;
 }
-
-const INTERVALS = [
-  { value: 'minute', label: '1 min' },
-  { value: '3minute', label: '3 min' },
-  { value: '5minute', label: '5 min' },
-  { value: '10minute', label: '10 min' },
-  { value: '15minute', label: '15 min' },
-  { value: '30minute', label: '30 min' },
-  { value: '60minute', label: '60 min' },
-];
 
 export default function Backtest() {
   const storePatterns = useStore((s) => s.patterns);
+  const storeTickers = useStore((s) => s.tickers);
   const setPatterns = useStore((s) => s.setPatterns);
+  const setTickers = useStore((s) => s.setTickers);
 
   const [patterns, setLocalPatterns] = useState<Pattern[]>(storePatterns);
+  const [tickers, setLocalTickers] = useState<Ticker[]>(storeTickers);
   const [form, setForm] = useState<BacktestForm>({
     pattern_id: '',
-    instrument_token: '',
-    symbol: '',
+    ticker_id: '',
     from_date: thirtyDaysAgo(),
     to_date: today(),
-    interval: 'day',
   });
 
   const [running, setRunning] = useState(false);
@@ -54,34 +43,33 @@ export default function Backtest() {
       const data = await getPatterns();
       setLocalPatterns(data);
       setPatterns(data);
-    } catch {
-      // already have store patterns
-    }
+    } catch { /* already have store patterns */ }
   }, [setPatterns]);
+
+  const loadTickers = useCallback(async () => {
+    try {
+      const data = await getTickers();
+      setLocalTickers(data);
+      setTickers(data);
+    } catch { /* already have store tickers */ }
+  }, [setTickers]);
 
   useEffect(() => {
     if (storePatterns.length === 0) loadPatterns();
     else setLocalPatterns(storePatterns);
   }, [storePatterns, loadPatterns]);
 
-  // Sync interval from selected pattern
   useEffect(() => {
-    if (form.pattern_id) {
-      const p = patterns.find((pat) => pat.id === Number(form.pattern_id));
-      if (p) setForm((f) => ({ ...f, interval: p.interval }));
-    }
-  }, [form.pattern_id, patterns]);
+    if (storeTickers.length === 0) loadTickers();
+    else setLocalTickers(storeTickers);
+  }, [storeTickers, loadTickers]);
 
   const setField = <K extends keyof BacktestForm>(k: K, v: BacktestForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const handleRun = async () => {
     if (!form.pattern_id) return toast.error('Select a pattern');
-    if (!form.instrument_token || !form.symbol)
-      return toast.error('Enter instrument token and symbol');
-
-    const token = Number(form.instrument_token);
-    if (isNaN(token)) return toast.error('Instrument token must be a number');
+    if (!form.ticker_id) return toast.error('Select a ticker');
 
     setRunning(true);
     setCandles([]);
@@ -90,11 +78,9 @@ export default function Backtest() {
     try {
       const result = await runBacktest({
         pattern_id: Number(form.pattern_id),
-        instrument_token: token,
-        symbol: form.symbol.toUpperCase(),
+        ticker_id: Number(form.ticker_id),
         from_date: form.from_date,
         to_date: form.to_date,
-        interval: form.interval,
       });
       setCandles(result.candles);
       setMatchCount(result.matches.length);
@@ -138,39 +124,22 @@ export default function Backtest() {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Interval</label>
+            <label style={styles.label}>Ticker</label>
             <select
               style={styles.select}
-              value={form.interval}
-              onChange={(e) => setField('interval', e.target.value)}
+              value={form.ticker_id}
+              onChange={(e) => setField('ticker_id', e.target.value)}
             >
-              {INTERVALS.map((iv) => (
-                <option key={iv.value} value={iv.value}>
-                  {iv.label}
+              <option value="">— select ticker —</option>
+              {tickers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.exchange}:{t.symbol}
                 </option>
               ))}
             </select>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Symbol</label>
-            <input
-              style={styles.input}
-              value={form.symbol}
-              onChange={(e) => setField('symbol', e.target.value)}
-              placeholder="e.g. RELIANCE"
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Instrument Token</label>
-            <input
-              style={styles.input}
-              value={form.instrument_token}
-              onChange={(e) => setField('instrument_token', e.target.value)}
-              placeholder="e.g. 738561"
-              type="number"
-            />
+            {tickers.length === 0 && (
+              <p style={styles.hint}>No tickers yet — add them in the Tickers page.</p>
+            )}
           </div>
 
           <div style={styles.formGroup}>
@@ -356,5 +325,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     fontWeight: 700,
     color: '#c0c0d8',
+  },
+  hint: {
+    margin: '4px 0 0',
+    fontSize: 11,
+    color: '#5a5a7a',
   },
 };

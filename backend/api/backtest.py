@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from db.models import get_session, Pattern
+from db.models import get_session, Pattern, Ticker
 from dsl.parser import parse, ParseError
 from dsl.validator import validate, ValidationError
 from dsl.compiler import compile_pattern
@@ -16,8 +16,7 @@ router = APIRouter(prefix="/backtest")
 
 class BacktestRequest(BaseModel):
     pattern_id: int
-    instrument_token: int
-    symbol: str
+    ticker_id: int
     from_date: date
     to_date: date
 
@@ -36,6 +35,10 @@ async def run_backtest(
     if not pattern:
         raise HTTPException(404, f"Pattern {req.pattern_id} not found")
 
+    ticker = await session.get(Ticker, req.ticker_id)
+    if not ticker:
+        raise HTTPException(404, f"Ticker {req.ticker_id} not found")
+
     try:
         ast = parse(pattern.dsl)
         validate(ast)
@@ -52,7 +55,7 @@ async def run_backtest(
 
     try:
         df = kite.historical_data(
-            instrument_token=req.instrument_token,
+            instrument_token=ticker.instrument_token,
             from_date=req.from_date,
             to_date=req.to_date,
             interval=pattern.interval,
