@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 import pandas as pd
 
@@ -22,39 +22,42 @@ class Indicator:
     compute: Callable[[pd.DataFrame, dict[str, Any]], pd.Series]
 
 
-def _ema_compute(df: pd.DataFrame, p: dict) -> pd.Series:
-    import pandas_ta as ta
-    return ta.ema(df["close"], length=p["period"])
+# ------------------------------------------------------------------ compute fns
+
+def _ema(df: pd.DataFrame, p: dict) -> pd.Series:
+    return df["close"].ewm(span=p["period"], adjust=False).mean()
 
 
-def _rsi_compute(df: pd.DataFrame, p: dict) -> pd.Series:
-    import pandas_ta as ta
-    return ta.rsi(df["close"], length=p["period"])
+def _rsi(df: pd.DataFrame, p: dict) -> pd.Series:
+    import ta
+    return ta.momentum.RSIIndicator(df["close"], window=p["period"]).rsi()
 
 
-def _bb_compute(df: pd.DataFrame, p: dict) -> pd.DataFrame:
-    import pandas_ta as ta
-    return ta.bbands(df["close"], length=p["period"], std=p["std"])
+def _bb_bands(df: pd.DataFrame, p: dict):
+    import ta
+    return ta.volatility.BollingerBands(df["close"], window=p["period"], window_dev=p["std"])
 
 
-def _atr_compute(df: pd.DataFrame, p: dict) -> pd.Series:
-    import pandas_ta as ta
-    return ta.atr(df["high"], df["low"], df["close"], length=p["period"])
+def _atr(df: pd.DataFrame, p: dict) -> pd.Series:
+    import ta
+    return ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=p["period"]).average_true_range()
 
 
-def _avg_volume_compute(df: pd.DataFrame, p: dict) -> pd.Series:
-    return df["volume"].rolling(p["period"]).mean()
+def _avg_volume(df: pd.DataFrame, p: dict) -> pd.Series:
+    return df["volume"].rolling(window=p["period"]).mean()
 
 
-def _macd_compute(df: pd.DataFrame, p: dict) -> pd.DataFrame:
-    import pandas_ta as ta
-    return ta.macd(df["close"], fast=p["fast"], slow=p["slow"], signal=p["signal"])
+def _macd_indicator(df: pd.DataFrame, p: dict):
+    import ta
+    return ta.trend.MACD(df["close"], window_fast=p["fast"], window_slow=p["slow"], window_sign=p["signal"])
 
 
-def _stoch_compute(df: pd.DataFrame, p: dict) -> pd.DataFrame:
-    import pandas_ta as ta
-    return ta.stoch(df["high"], df["low"], df["close"], k=p["period"])
+def _stoch(df: pd.DataFrame, p: dict):
+    import ta
+    return ta.momentum.StochasticOscillator(df["high"], df["low"], df["close"], window=p["period"])
 
+
+# ------------------------------------------------------------------ registry
 
 INDICATORS: dict[str, Indicator] = {
     "ema": Indicator(
@@ -65,7 +68,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period"),
         },
         lookback=lambda p: p["period"],
-        compute=_ema_compute,
+        compute=_ema,
     ),
     "rsi": Indicator(
         label="RSI",
@@ -75,7 +78,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period", default=14),
         },
         lookback=lambda p: p["period"],
-        compute=_rsi_compute,
+        compute=_rsi,
     ),
     "bb_upper": Indicator(
         label="Bollinger Band Upper",
@@ -86,7 +89,7 @@ INDICATORS: dict[str, Indicator] = {
             "std": Param(type=float, description="Standard deviation multiplier", default=2.0),
         },
         lookback=lambda p: p["period"],
-        compute=lambda df, p: _bb_compute(df, p).filter(like="BBU").iloc[:, 0],
+        compute=lambda df, p: _bb_bands(df, p).bollinger_hband(),
     ),
     "bb_lower": Indicator(
         label="Bollinger Band Lower",
@@ -97,7 +100,7 @@ INDICATORS: dict[str, Indicator] = {
             "std": Param(type=float, description="Standard deviation multiplier", default=2.0),
         },
         lookback=lambda p: p["period"],
-        compute=lambda df, p: _bb_compute(df, p).filter(like="BBL").iloc[:, 0],
+        compute=lambda df, p: _bb_bands(df, p).bollinger_lband(),
     ),
     "bb_mid": Indicator(
         label="Bollinger Band Mid",
@@ -107,7 +110,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="SMA lookback period", default=20),
         },
         lookback=lambda p: p["period"],
-        compute=lambda df, p: _bb_compute(df, {**p, "std": 2.0}).filter(like="BBM").iloc[:, 0],
+        compute=lambda df, p: _bb_bands(df, {**p, "std": 2.0}).bollinger_mavg(),
     ),
     "atr": Indicator(
         label="ATR",
@@ -117,7 +120,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period", default=14),
         },
         lookback=lambda p: p["period"],
-        compute=_atr_compute,
+        compute=_atr,
     ),
     "avg_volume": Indicator(
         label="Average Volume",
@@ -127,7 +130,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period"),
         },
         lookback=lambda p: p["period"],
-        compute=_avg_volume_compute,
+        compute=_avg_volume,
     ),
     "macd": Indicator(
         label="MACD",
@@ -139,7 +142,7 @@ INDICATORS: dict[str, Indicator] = {
             "signal": Param(type=int, description="Signal line period", default=9),
         },
         lookback=lambda p: p["slow"] + p["signal"],
-        compute=lambda df, p: _macd_compute(df, p).filter(like="MACD_").iloc[:, 0],
+        compute=lambda df, p: _macd_indicator(df, p).macd(),
     ),
     "macd_signal": Indicator(
         label="MACD Signal",
@@ -151,7 +154,7 @@ INDICATORS: dict[str, Indicator] = {
             "signal": Param(type=int, description="Signal line period", default=9),
         },
         lookback=lambda p: p["slow"] + p["signal"],
-        compute=lambda df, p: _macd_compute(df, p).filter(like="MACDs_").iloc[:, 0],
+        compute=lambda df, p: _macd_indicator(df, p).macd_signal(),
     ),
     "stoch_k": Indicator(
         label="Stochastic %K",
@@ -161,7 +164,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period", default=14),
         },
         lookback=lambda p: p["period"],
-        compute=lambda df, p: _stoch_compute(df, p).filter(like="STOCHk_").iloc[:, 0],
+        compute=lambda df, p: _stoch(df, p).stoch(),
     ),
     "stoch_d": Indicator(
         label="Stochastic %D",
@@ -171,7 +174,7 @@ INDICATORS: dict[str, Indicator] = {
             "period": Param(type=int, description="Lookback period", default=14),
         },
         lookback=lambda p: p["period"],
-        compute=lambda df, p: _stoch_compute(df, p).filter(like="STOCHd_").iloc[:, 0],
+        compute=lambda df, p: _stoch(df, p).stoch_signal(),
     ),
 }
 
@@ -184,9 +187,8 @@ def get_indicator(name: str) -> Indicator:
 
 def indicator_metadata() -> list[dict]:
     """Serializable metadata for the frontend autocomplete provider."""
-    result = []
-    for name, ind in INDICATORS.items():
-        result.append({
+    return [
+        {
             "name": name,
             "label": ind.label,
             "description": ind.description,
@@ -198,5 +200,6 @@ def indicator_metadata() -> list[dict]:
                 }
                 for k, v in ind.params.items()
             },
-        })
-    return result
+        }
+        for name, ind in INDICATORS.items()
+    ]

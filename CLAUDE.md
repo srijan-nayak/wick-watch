@@ -33,7 +33,7 @@ wick-watch/
 | Desktop shell | Tauri (Rust, native webview) |
 | Frontend | React + TradingView Lightweight Charts + Monaco Editor |
 | Backend | Python 3.11+, FastAPI, WebSocket |
-| Indicators | pandas-ta |
+| Indicators | ta (pure pandas; pandas-ta dropped — no Python 3.14 support via numba) |
 | DB | SQLite via SQLModel |
 | Kite integration | kiteconnect Python SDK |
 
@@ -73,8 +73,8 @@ atr(candle=1, period=14)
 
 ## Running locally (dev mode)
 ```bash
-# Terminal 1 — backend
-cd backend && uvicorn main:app --reload
+# Terminal 1 — backend (use the venv at backend/.venv)
+cd backend && .venv/bin/uvicorn main:app --reload
 
 # Terminal 2 — frontend + Tauri
 cd frontend && npm run dev        # or inside Tauri: cargo tauri dev
