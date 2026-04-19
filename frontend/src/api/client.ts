@@ -18,6 +18,7 @@ export interface Pattern {
 export interface Ticker {
   id: number;
   symbol: string;
+  exchange: string;
   instrument_token: number;
   is_active: boolean;
 }
@@ -132,8 +133,7 @@ export const getTickers = () =>
 
 export const createTicker = (body: {
   symbol: string;
-  instrument_token: number;
-  is_active: boolean;
+  exchange: string;
 }) => request<Ticker>('/api/tickers', { method: 'POST', body: JSON.stringify(body) });
 
 export const deleteTicker = (id: number) =>

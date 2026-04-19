@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from db.models import get_session, Pattern, Ticker
 from indicators.registry import indicator_metadata
@@ -68,8 +69,46 @@ async def list_tickers(session: AsyncSession = Depends(get_session)):
     return result.all()
 
 
+class AddTickerRequest(BaseModel):
+    symbol: str
+    exchange: str
+
+
 @router.post("/tickers")
-async def add_ticker(ticker: Ticker, session: AsyncSession = Depends(get_session)):
+async def add_ticker(req: AddTickerRequest, session: AsyncSession = Depends(get_session)):
+    symbol = req.symbol.strip().upper()
+    exchange = req.exchange.strip().upper()
+
+    try:
+        kite = get_kite_client()
+    except RuntimeError:
+        raise HTTPException(401, "Not authenticated")
+
+    # Resolve instrument token from Kite's instrument dump
+    instruments = kite.search_instruments(exchange=exchange)
+    match = next(
+        (i for i in instruments if i["tradingsymbol"].upper() == symbol),
+        None,
+    )
+    if match is None:
+        raise HTTPException(
+            404,
+            f"Symbol '{symbol}' not found on {exchange}. "
+            "Check the symbol spelling or try a different exchange.",
+        )
+
+    token: int = match["instrument_token"]
+
+    # Deduplicate: return existing row if already tracked
+    existing = (
+        await session.exec(
+            select(Ticker).where(Ticker.instrument_token == token)
+        )
+    ).first()
+    if existing:
+        return existing
+
+    ticker = Ticker(symbol=symbol, exchange=exchange, instrument_token=token)
     session.add(ticker)
     await session.commit()
     await session.refresh(ticker)

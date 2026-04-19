@@ -6,7 +6,7 @@ import {
   deleteTicker,
   searchInstruments,
 } from '../api/client';
-import type { Ticker, Instrument } from '../api/client';
+import type { Ticker } from '../api/client';
 import { useStore } from '../store';
 
 export default function Tickers() {
@@ -15,9 +15,8 @@ export default function Tickers() {
 
   const [query, setQuery] = useState('');
   const [exchange, setExchange] = useState('NSE');
-  const [searchResults, setSearchResults] = useState<Instrument[]>([]);
+  const [searchResults, setSearchResults] = useState<{ symbol: string; name: string }[]>([]);
   const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
   const loadTickers = useCallback(async () => {
     try {
@@ -35,46 +34,31 @@ export default function Tickers() {
   const handleSearch = async () => {
     if (!query.trim()) return;
     setSearching(true);
-    setSearchError(null);
     try {
       const results = await searchInstruments(exchange, query.trim());
-      setSearchResults(results);
+      setSearchResults(results.map((r) => ({ symbol: r.symbol, name: r.name })));
+      if (results.length === 0) toast.info('No instruments found');
     } catch {
-      // Backend may not implement this endpoint yet — fall back to local filter
-      setSearchError('Instrument search endpoint not available. Showing active tickers filtered by query.');
-      const localFilter = tickers.filter(
-        (t) =>
-          t.symbol.toLowerCase().includes(query.toLowerCase()),
-      );
-      setSearchResults(
-        localFilter.map((t) => ({
-          instrument_token: t.instrument_token,
-          symbol: t.symbol,
-          name: t.symbol,
-          exchange,
-        })),
-      );
+      toast.error('Instrument search failed. Is the backend running?');
     } finally {
       setSearching(false);
     }
   };
 
-  const handleAdd = async (instrument: Instrument) => {
+  const handleAdd = async (symbol: string) => {
     const exists = tickers.some(
-      (t) => t.instrument_token === instrument.instrument_token,
+      (t) => t.symbol === symbol && t.exchange === exchange,
     );
     if (exists) {
-      toast.info(`${instrument.symbol} is already added`);
+      toast.info(`${exchange}:${symbol} is already tracked`);
       return;
     }
     try {
-      const created = await createTicker({
-        symbol: instrument.symbol,
-        instrument_token: instrument.instrument_token,
-        is_active: true,
-      });
+      const created = await createTicker({ symbol, exchange });
       setTickers([...tickers, created]);
-      toast.success(`Added ${instrument.symbol}`);
+      setSearchResults([]);
+      setQuery('');
+      toast.success(`Added ${exchange}:${symbol}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add ticker');
     }
@@ -128,21 +112,19 @@ export default function Tickers() {
           </button>
         </div>
 
-        {searchError && <p style={styles.searchError}>{searchError}</p>}
-
         {searchResults.length > 0 && (
           <div style={styles.searchResults}>
             {searchResults.map((inst) => (
-              <div key={inst.instrument_token} style={styles.searchResultItem}>
+              <div key={inst.symbol} style={styles.searchResultItem}>
                 <div style={styles.instInfo}>
                   <span style={styles.instSymbol}>{inst.symbol}</span>
-                  <span style={styles.instMeta}>
-                    {inst.exchange} · token: {inst.instrument_token}
-                  </span>
+                  {inst.name && inst.name !== inst.symbol && (
+                    <span style={styles.instMeta}>{inst.name}</span>
+                  )}
                 </div>
                 <button
                   style={styles.addBtn}
-                  onClick={() => handleAdd(inst)}
+                  onClick={() => handleAdd(inst.symbol)}
                 >
                   + Add
                 </button>
@@ -168,7 +150,7 @@ export default function Tickers() {
             <div key={t.id} style={styles.tickerItem}>
               <div style={styles.tickerInfo}>
                 <span style={styles.tickerSymbol}>{t.symbol}</span>
-                <span style={styles.tickerToken}>token: {t.instrument_token}</span>
+                <span style={styles.tickerExchange}>{t.exchange}</span>
               </div>
               <div style={styles.tickerActions}>
                 <span
@@ -283,15 +265,6 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0.6,
     cursor: 'not-allowed',
   },
-  searchError: {
-    margin: 0,
-    fontSize: 12,
-    color: '#f59e0b',
-    background: '#2a200a',
-    border: '1px solid #4a3a0a',
-    borderRadius: 6,
-    padding: '8px 12px',
-  },
   searchResults: {
     display: 'flex',
     flexDirection: 'column',
@@ -370,7 +343,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#d0d0e8',
   },
-  tickerToken: {
+  tickerExchange: {
     fontSize: 11,
     color: '#5a5a7a',
   },

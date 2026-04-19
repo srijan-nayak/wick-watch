@@ -29,7 +29,8 @@ class Pattern(SQLModel, table=True):
 
 class Ticker(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    symbol: str          # e.g. "NSE:INFY"
+    symbol: str           # trading symbol, e.g. "INFY"
+    exchange: str         # "NSE" | "BSE" | "NFO" etc.
     instrument_token: int
     is_active: bool = True
     added_at: datetime = Field(default_factory=datetime.utcnow)
