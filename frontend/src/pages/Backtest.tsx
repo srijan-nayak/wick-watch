@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { getPatterns, getTickers, runBacktest } from '../api/client';
-import type { Candle, Pattern, Ticker } from '../api/client';
+import type { Candle } from '../api/client';
 import { useStore } from '../store';
 import CandleChart from '../components/CandleChart';
 
@@ -20,13 +20,11 @@ interface BacktestForm {
 }
 
 export default function Backtest() {
-  const storePatterns = useStore((s) => s.patterns);
-  const storeTickers = useStore((s) => s.tickers);
+  const patterns = useStore((s) => s.patterns);
+  const tickers = useStore((s) => s.tickers);
   const setPatterns = useStore((s) => s.setPatterns);
   const setTickers = useStore((s) => s.setTickers);
 
-  const [patterns, setLocalPatterns] = useState<Pattern[]>(storePatterns);
-  const [tickers, setLocalTickers] = useState<Ticker[]>(storeTickers);
   const [form, setForm] = useState<BacktestForm>({
     pattern_id: '',
     ticker_id: '',
@@ -38,31 +36,11 @@ export default function Backtest() {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [matchCount, setMatchCount] = useState<number | null>(null);
 
-  const loadPatterns = useCallback(async () => {
-    try {
-      const data = await getPatterns();
-      setLocalPatterns(data);
-      setPatterns(data);
-    } catch { /* already have store patterns */ }
-  }, [setPatterns]);
-
-  const loadTickers = useCallback(async () => {
-    try {
-      const data = await getTickers();
-      setLocalTickers(data);
-      setTickers(data);
-    } catch { /* already have store tickers */ }
-  }, [setTickers]);
-
   useEffect(() => {
-    if (storePatterns.length === 0) loadPatterns();
-    else setLocalPatterns(storePatterns);
-  }, [storePatterns, loadPatterns]);
-
-  useEffect(() => {
-    if (storeTickers.length === 0) loadTickers();
-    else setLocalTickers(storeTickers);
-  }, [storeTickers, loadTickers]);
+    getPatterns().then(setPatterns).catch(() => {});
+    getTickers().then(setTickers).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setField = <K extends keyof BacktestForm>(k: K, v: BacktestForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
