@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 from db.models import get_session, Pattern, Ticker
 from indicators.registry import indicator_metadata
+from api.state import get_kite_client
 from sqlmodel import select
 
 router = APIRouter()
@@ -10,6 +11,23 @@ router = APIRouter()
 @router.get("/indicators")
 async def get_indicators():
     return indicator_metadata()
+
+
+@router.get("/instruments")
+async def search_instruments(
+    query: str = Query(..., min_length=1),
+    exchange: str = Query("NSE"),
+):
+    try:
+        kite = get_kite_client()
+    except RuntimeError:
+        raise HTTPException(401, "Not authenticated")
+    instruments = kite.search_instruments(exchange=exchange)
+    q = query.lower()
+    return [
+        i for i in instruments
+        if q in i["tradingsymbol"].lower() or q in i["name"].lower()
+    ][:30]
 
 
 @router.get("/patterns")
