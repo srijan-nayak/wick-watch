@@ -12,11 +12,9 @@ const NAV_ITEMS = [
 
 export default function NavBar() {
   const navigate = useNavigate();
-  const { user, clearAuth, isLiveRunning } = useStore((s) => ({
-    user: s.user,
-    clearAuth: s.clearAuth,
-    isLiveRunning: s.isLiveRunning,
-  }));
+  const user = useStore((s) => s.user);
+  const clearAuth = useStore((s) => s.clearAuth);
+  const isLiveRunning = useStore((s) => s.isLiveRunning);
 
   const handleLogout = async () => {
     try {

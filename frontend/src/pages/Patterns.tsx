@@ -24,10 +24,8 @@ const INTERVALS = [
 const EMPTY_FORM = { name: '', dsl: '', interval: 'minute' };
 
 export default function Patterns() {
-  const { patterns, setPatterns } = useStore((s) => ({
-    patterns: s.patterns,
-    setPatterns: s.setPatterns,
-  }));
+  const patterns = useStore((s) => s.patterns);
+  const setPatterns = useStore((s) => s.setPatterns);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);

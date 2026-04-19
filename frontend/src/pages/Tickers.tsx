@@ -10,10 +10,8 @@ import type { Ticker, Instrument } from '../api/client';
 import { useStore } from '../store';
 
 export default function Tickers() {
-  const { tickers, setTickers } = useStore((s) => ({
-    tickers: s.tickers,
-    setTickers: s.setTickers,
-  }));
+  const tickers = useStore((s) => s.tickers);
+  const setTickers = useStore((s) => s.setTickers);
 
   const [query, setQuery] = useState('');
   const [exchange, setExchange] = useState('NSE');

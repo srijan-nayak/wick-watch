@@ -46,12 +46,10 @@ function AlertRow({ alert }: { alert: Alert }) {
 }
 
 export default function Live() {
-  const { isLiveRunning, setLiveRunning, alerts, clearAlerts } = useStore((s) => ({
-    isLiveRunning: s.isLiveRunning,
-    setLiveRunning: s.setLiveRunning,
-    alerts: s.alerts,
-    clearAlerts: s.clearAlerts,
-  }));
+  const isLiveRunning = useStore((s) => s.isLiveRunning);
+  const setLiveRunning = useStore((s) => s.setLiveRunning);
+  const alerts = useStore((s) => s.alerts);
+  const clearAlerts = useStore((s) => s.clearAlerts);
 
   const fetchStatus = useCallback(async () => {
     try {
