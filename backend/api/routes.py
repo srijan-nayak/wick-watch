@@ -26,7 +26,13 @@ async def search_instruments(
     instruments = kite.search_instruments(exchange=exchange)
     q = query.lower()
     return [
-        i for i in instruments
+        {
+            "symbol": i["tradingsymbol"],
+            "name": i["name"],
+            "exchange": i["exchange"],
+            "instrument_token": i["instrument_token"],
+        }
+        for i in instruments
         if q in i["tradingsymbol"].lower() or q in i["name"].lower()
     ][:30]
 
