@@ -10,6 +10,7 @@ import { getAuthStatus } from './api/client';
 import { useStore } from './store';
 import { useWebSocket } from './hooks/useWebSocket';
 import NavBar from './components/NavBar';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Callback from './pages/Callback';
 import Patterns from './pages/Patterns';
@@ -106,27 +107,29 @@ const bootstrapStyles: Record<string, React.CSSProperties> = {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Bootstrap>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/callback" element={<Callback />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Bootstrap>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/callback" element={<Callback />} />
 
-          {/* Protected routes */}
-          <Route element={<RequireAuth />}>
-            <Route element={<AppShell />}>
-              <Route path="/patterns" element={<Patterns />} />
-              <Route path="/tickers" element={<Tickers />} />
-              <Route path="/backtest" element={<Backtest />} />
-              <Route path="/live" element={<Live />} />
+            {/* Protected routes */}
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route path="/patterns" element={<ErrorBoundary><Patterns /></ErrorBoundary>} />
+                <Route path="/tickers" element={<ErrorBoundary><Tickers /></ErrorBoundary>} />
+                <Route path="/backtest" element={<ErrorBoundary><Backtest /></ErrorBoundary>} />
+                <Route path="/live" element={<ErrorBoundary><Live /></ErrorBoundary>} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Default redirect */}
-          <Route path="*" element={<Navigate to="/patterns" replace />} />
-        </Routes>
-      </Bootstrap>
-    </BrowserRouter>
+            {/* Default redirect */}
+            <Route path="*" element={<Navigate to="/patterns" replace />} />
+          </Routes>
+        </Bootstrap>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

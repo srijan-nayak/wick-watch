@@ -97,11 +97,11 @@ export default function Backtest() {
         interval: form.interval,
       });
       setCandles(result.candles);
-      setMatchCount(result.matches);
-      if (result.matches === 0) {
+      setMatchCount(result.matches.length);
+      if (result.matches.length === 0) {
         toast.info('Backtest complete — no matches found');
       } else {
-        toast.success(`Found ${result.matches} match${result.matches !== 1 ? 'es' : ''}!`);
+        toast.success(`Found ${result.matches.length} match${result.matches.length !== 1 ? 'es' : ''}!`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Backtest failed');

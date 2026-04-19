@@ -55,7 +55,7 @@ export interface LiveStatus {
 
 export interface BacktestResult {
   candles: Candle[];
-  matches: number;
+  matches: string[];
 }
 
 export interface Instrument {
