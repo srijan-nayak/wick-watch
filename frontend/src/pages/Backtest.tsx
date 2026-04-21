@@ -245,9 +245,14 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
     color: '#e8e8f0',
     fontSize: 13,
-    padding: '10px 14px',
+    padding: '10px 36px 10px 14px',
     outline: 'none',
     cursor: 'pointer',
+    width: '100%',
+    // Custom chevron replaces the native arrow removed by appearance:none in index.css
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237878a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
   },
   runBtn: {
     background: '#6366f1',

@@ -83,6 +83,25 @@ button:hover {
   filter: brightness(1.1);
 }
 
+/* ─── WebKit select reset ───────────────────────────────────────────────────── */
+/* Without this, Safari / Tauri (WKWebView) ignores background-color on <select> */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ─── WebKit date input ─────────────────────────────────────────────────────── */
+/* Style the inner calendar icon to match the dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6) brightness(0.8);
+  cursor: pointer;
+}
+/* Remove the default inner spin/clear buttons */
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none;
+}
+
 /* ─── Selection ─────────────────────────────────────────────────────────────── */
 ::selection {
   background: rgba(99, 102, 241, 0.3);
