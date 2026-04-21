@@ -9,8 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
+    "pretauri:dev": "bash ../scripts/ensure_sidecar.sh",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "setup:backend": "bash ../scripts/ensure_sidecar.sh && cd .. && python3 -m venv backend/.venv && backend/.venv/bin/pip install -q -r backend/requirements.txt && echo 'Backend venv ready'",
+    "bundle:backend": "cd .. && bash scripts/bundle_backend.sh"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
