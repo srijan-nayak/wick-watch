@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { getLoginUrl, getAuthStatus } from '../api/client';
 import { useStore } from '../store';
 import { toast } from 'sonner';
+
+/** True when running inside the Tauri webview (not a plain browser). */
+const isTauri = () => '__TAURI_INTERNALS__' in window;
 
 export default function Login() {
   const navigate = useNavigate();
@@ -42,23 +46,12 @@ export default function Login() {
     try {
       const { url } = await getLoginUrl();
 
-      // Try Tauri plugin-shell first; fall back to window.open for web dev
-      let opened = false;
-      try {
-        // Dynamic import at runtime — skipped when not in Tauri context
-        // The string is intentionally split so TypeScript does not try to
-        // resolve it as a static module at compile time.
-        const pluginName = '@tauri-apps' + '/plugin-shell';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const shell: any = await import(/* @vite-ignore */ pluginName);
-        if (typeof shell?.open === 'function') {
-          await (shell.open as (url: string) => Promise<void>)(url);
-          opened = true;
-        }
-      } catch {
-        // plugin not installed or running in browser — use fallback
-      }
-      if (!opened) {
+      // Open in the system browser.
+      // In Tauri, window.open() doesn't reach the real browser, so we use
+      // the shell plugin instead. In plain browser dev mode, use window.open.
+      if (isTauri()) {
+        await shellOpen(url);
+      } else {
         window.open(url, '_blank');
       }
 
