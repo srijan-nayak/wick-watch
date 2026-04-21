@@ -1,8 +1,14 @@
 from __future__ import annotations
 import os
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
+
+# True when the built React SPA is present (Docker / web mode).
+# In Tauri mode there is no static/ dir; the desktop app polls /api/auth/status.
+_WEB_MODE = (Path(__file__).parent.parent / "static").is_dir()
 
 from db.models import get_session, UserSession
 from kite.client import KiteClient
@@ -67,6 +73,12 @@ async def auth_callback(
     await session.commit()
 
     set_kite_client(KiteClient(api_key=_api_key(), access_token=access_token))
+
+    # Web mode: redirect the browser back to the SPA callback page so the user
+    # doesn't see raw JSON.  Tauri mode: return JSON; the desktop app polls
+    # /api/auth/status and never renders this response in its own webview.
+    if _WEB_MODE:
+        return RedirectResponse(url="/callback?status=success", status_code=302)
     return {"user_id": user_id, "user_name": user_name}
 
 

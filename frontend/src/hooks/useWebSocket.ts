@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 
-const WS_URL = 'ws://localhost:8000/ws';
+// Tauri webview: absolute ws URL to the local backend.
+// Browser (Docker/web): derive from the page's own host so it works behind
+// any reverse proxy and supports both ws:// and wss://.
+const WS_URL =
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+    ? 'ws://localhost:8000/ws'
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
 const MAX_BACKOFF_MS = 30_000;
 
 interface WsMessage {

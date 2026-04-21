@@ -1,12 +1,15 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import select
 
 from api.routes import router as api_router
@@ -59,3 +62,18 @@ app.include_router(auth_router,     prefix="/api")
 app.include_router(backtest_router, prefix="/api")
 app.include_router(live_router,     prefix="/api")
 app.include_router(ws_router)
+
+# ── Web / Docker mode: serve the built React SPA ──────────────────────────────
+# When the Docker image is built, the Vite output is copied to static/.
+# All non-API, non-WS paths serve index.html so React Router handles routing.
+_STATIC = Path(__file__).parent / "static"
+if _STATIC.is_dir():
+    # Serve Vite's hashed asset files (/assets/*.js, /assets/*.css)
+    app.mount("/assets", StaticFiles(directory=str(_STATIC / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa_fallback(full_path: str = ""):
+        candidate = _STATIC / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_STATIC / "index.html"))

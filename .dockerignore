@@ -1,0 +1,36 @@
+# Python
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+backend/dist/
+backend/build/
+backend/wickwatch.db
+backend/*.spec.bak
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Tauri (not used in the Docker web build)
+frontend/src-tauri/target/
+frontend/src-tauri/binaries/
+
+# Rust
+**/target/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS / IDE
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Project scripts and docs (not needed inside the container)
+scripts/
+docs/

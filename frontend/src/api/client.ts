@@ -68,7 +68,13 @@ export interface Instrument {
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = 'http://localhost:8000';
+// In Tauri the webview origin is tauri://localhost, so API calls must be
+// absolute. In a plain browser (Docker / web) the frontend is served by the
+// same FastAPI server, so relative URLs work and avoid CORS entirely.
+const BASE_URL =
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+    ? 'http://localhost:8000'
+    : '';
 
 async function request<T>(
   path: string,
