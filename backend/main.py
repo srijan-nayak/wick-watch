@@ -43,7 +43,12 @@ app = FastAPI(title="WickWatch", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "tauri://localhost"],
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "tauri://localhost",       # macOS / Linux Tauri webview
+        "http://tauri.localhost",  # Windows Tauri webview
+        "http://localhost",        # fallback
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
