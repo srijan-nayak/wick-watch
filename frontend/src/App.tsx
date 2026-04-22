@@ -17,6 +17,7 @@ import Patterns from './pages/Patterns';
 import Tickers from './pages/Tickers';
 import Backtest from './pages/Backtest';
 import Live from './pages/Live';
+import Docs from './pages/Docs';
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export default function App() {
                 <Route path="/tickers" element={<ErrorBoundary><Tickers /></ErrorBoundary>} />
                 <Route path="/backtest" element={<ErrorBoundary><Backtest /></ErrorBoundary>} />
                 <Route path="/live" element={<ErrorBoundary><Live /></ErrorBoundary>} />
+                <Route path="/docs" element={<ErrorBoundary><Docs /></ErrorBoundary>} />
               </Route>
             </Route>
 

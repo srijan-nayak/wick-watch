@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/tickers', label: 'Tickers', icon: '◈' },
   { to: '/backtest', label: 'Backtest', icon: '↺' },
   { to: '/live', label: 'Live', icon: '◉' },
+  { to: '/docs', label: 'Docs', icon: '?' },
 ] as const;
 
 export default function NavBar() {
