@@ -1,8 +1,13 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { getLiveStatus, startLive, stopLive } from '../api/client';
 import { useStore } from '../store';
 import type { Alert } from '../api/client';
+import {
+  requestNotificationPermission,
+  notificationPermission,
+  playAlertChime,
+} from '../lib/alertNotify';
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -51,6 +56,10 @@ export default function Live() {
   const alerts = useStore((s) => s.alerts);
   const clearAlerts = useStore((s) => s.clearAlerts);
 
+  const [notifPerm, setNotifPerm] = useState<ReturnType<typeof notificationPermission>>(
+    () => notificationPermission(),
+  );
+
   const fetchStatus = useCallback(async () => {
     try {
       const status = await getLiveStatus();
@@ -65,6 +74,14 @@ export default function Live() {
   }, [fetchStatus]);
 
   const handleStart = async () => {
+    // Request notification permission on this user gesture so the browser allows it
+    if (notifPerm === 'default') {
+      const granted = await requestNotificationPermission();
+      setNotifPerm(granted ? 'granted' : 'denied');
+    }
+    // Warm up the AudioContext (requires a user gesture on some browsers)
+    playAlertChime();
+
     try {
       await startLive();
       setLiveRunning(true);
@@ -107,6 +124,26 @@ export default function Live() {
               {isLiveRunning ? 'Running' : 'Stopped'}
             </span>
           </div>
+
+          {/* Notification permission badge */}
+          {notifPerm !== 'unsupported' && (
+            <div
+              style={{
+                ...styles.notifBadge,
+                borderColor: notifPerm === 'granted' ? '#166534' : notifPerm === 'denied' ? '#7f1d1d' : '#3a3a2a',
+                color: notifPerm === 'granted' ? '#4ade80' : notifPerm === 'denied' ? '#f87171' : '#a0a020',
+              }}
+              title={
+                notifPerm === 'granted'
+                  ? 'Browser notifications enabled'
+                  : notifPerm === 'denied'
+                  ? 'Browser notifications blocked — allow them in your browser settings'
+                  : 'Notifications will be requested when you start detection'
+              }
+            >
+              {notifPerm === 'granted' ? '🔔 Notifications on' : notifPerm === 'denied' ? '🔕 Notifications blocked' : '🔔 Notifications'}
+            </div>
+          )}
         </div>
 
         <div style={styles.controls}>
@@ -201,6 +238,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: '0.04em',
+  },
+  notifBadge: {
+    fontSize: 11,
+    fontWeight: 600,
+    border: '1px solid',
+    borderRadius: 20,
+    padding: '4px 12px',
+    cursor: 'default',
+    letterSpacing: '0.02em',
   },
   controls: {
     display: 'flex',

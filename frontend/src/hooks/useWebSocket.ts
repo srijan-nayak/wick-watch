@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { fireAlert } from '../lib/alertNotify';
 
 // Tauri webview: absolute ws URL to the local backend.
 // Browser (Docker/web): derive from the page's own host so it works behind
@@ -67,6 +68,7 @@ export function useWebSocket() {
           candle_time: msg.candle_time,
           triggered_at: new Date().toISOString(),
         });
+        fireAlert(msg.pattern, msg.symbol, msg.candle_time);
       }
     };
 
