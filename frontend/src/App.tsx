@@ -65,12 +65,13 @@ function AppShell() {
 const shellStyles: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex',
-    minHeight: '100vh',
+    height: '100vh',       // fixed height so main becomes a real scroll container
     background: 'var(--bg-base)',
   },
   main: {
     flex: 1,
     overflowY: 'auto',
+    minHeight: 0,          // prevents flex item from overflowing its parent
   },
 };
 

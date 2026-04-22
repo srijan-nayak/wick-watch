@@ -351,7 +351,7 @@ const s: Record<string, React.CSSProperties> = {
     minWidth: 200,
     position: 'sticky',
     top: 0,
-    maxHeight: '100vh',
+    height: '100vh',       // fills the viewport height exactly so it sticks properly
     overflowY: 'auto',
     padding: '28px 0 28px 20px',
     borderRight: '1px solid var(--border-subtle)',
