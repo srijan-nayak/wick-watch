@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -5,8 +6,52 @@ from db.models import get_session, Pattern, Ticker
 from indicators.registry import indicator_metadata
 from api.state import get_kite_client
 from sqlmodel import select
+from dsl.parser import parse, ParseError
+from dsl.validator import validate, ValidationError
+from dsl.lexer import LexError
 
 router = APIRouter()
+
+
+# ─── DSL validation ───────────────────────────────────────────────────────────
+
+class ValidateDslRequest(BaseModel):
+    dsl: str
+
+class DslError(BaseModel):
+    line: int
+    col: int
+    message: str
+
+class ValidateDslResponse(BaseModel):
+    ok: bool
+    errors: list[DslError] = []
+
+_LOC_RE = re.compile(r"Line (\d+):(\d+)")
+
+def _parse_location(msg: str) -> tuple[int, int]:
+    m = _LOC_RE.search(msg)
+    return (int(m.group(1)), int(m.group(2))) if m else (1, 1)
+
+
+@router.post("/dsl/validate", response_model=ValidateDslResponse)
+async def validate_dsl(req: ValidateDslRequest):
+    dsl = req.dsl.strip()
+    if not dsl:
+        return ValidateDslResponse(ok=True)
+    try:
+        ast = parse(dsl)
+        validate(ast)
+        return ValidateDslResponse(ok=True)
+    except (ParseError, LexError) as exc:
+        msg = str(exc)
+        line, col = _parse_location(msg)
+        # Strip the "Line X:Y — " prefix from the user-facing message
+        # since Monaco already shows the location in the gutter
+        clean = _LOC_RE.sub("", msg).lstrip(" —").strip()
+        return ValidateDslResponse(ok=False, errors=[DslError(line=line, col=col, message=clean)])
+    except ValidationError as exc:
+        return ValidateDslResponse(ok=False, errors=[DslError(line=1, col=1, message=str(exc))])
 
 
 @router.get("/indicators")

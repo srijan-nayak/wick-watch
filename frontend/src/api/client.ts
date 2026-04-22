@@ -107,6 +107,25 @@ export const getAuthStatus = () =>
 export const logout = () =>
   request<void>('/api/auth/logout', { method: 'POST' });
 
+// ─── DSL ──────────────────────────────────────────────────────────────────────
+
+export interface DslError {
+  line: number;
+  col: number;
+  message: string;
+}
+
+export interface DslValidateResult {
+  ok: boolean;
+  errors: DslError[];
+}
+
+export const validateDsl = (dsl: string) =>
+  request<DslValidateResult>('/api/dsl/validate', {
+    method: 'POST',
+    body: JSON.stringify({ dsl }),
+  });
+
 // ─── Indicators ───────────────────────────────────────────────────────────────
 
 export const getIndicators = () =>
