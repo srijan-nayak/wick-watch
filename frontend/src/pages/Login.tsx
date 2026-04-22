@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { getLoginUrl, getAuthStatus } from '../api/client';
 import { useStore } from '../store';
 import { toast } from 'sonner';
-
-/** True when running inside the Tauri webview (not a plain browser). */
-const isTauri = () => '__TAURI_INTERNALS__' in window;
 
 export default function Login() {
   const navigate = useNavigate();
@@ -46,14 +42,7 @@ export default function Login() {
     try {
       const { url } = await getLoginUrl();
 
-      // Open in the system browser.
-      // In Tauri, window.open() doesn't reach the real browser, so we use
-      // the shell plugin instead. In plain browser dev mode, use window.open.
-      if (isTauri()) {
-        await shellOpen(url);
-      } else {
-        window.open(url, '_blank');
-      }
+      window.open(url, '_blank');
 
       startPolling();
       toast.info('Complete login in your browser, then return here.');

@@ -7,18 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "pretauri:dev": "bash ../scripts/ensure_sidecar.sh",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "setup:backend": "bash ../scripts/ensure_sidecar.sh && cd .. && python3 -m venv backend/.venv && backend/.venv/bin/pip install -q -r backend/requirements.txt && echo 'Backend venv ready'",
-    "bundle:backend": "cd .. && bash scripts/bundle_backend.sh"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-shell": "^2.3.5",
     "lightweight-charts": "^5.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -28,7 +20,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
