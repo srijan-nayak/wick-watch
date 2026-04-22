@@ -5,14 +5,14 @@ import type { Indicator } from '../api/client';
 // ─── TOC definition ────────────────────────────────────────────────────────────
 
 const TOC = [
-  { id: 'getting-started',   label: 'Getting Started' },
-  { id: 'dsl-overview',      label: 'DSL Overview' },
-  { id: 'candle-refs',       label: '  Candle references' },
-  { id: 'ohlc-fields',       label: '  OHLC & boolean fields' },
-  { id: 'arithmetic',        label: '  Arithmetic' },
-  { id: 'operators',         label: '  Operators & logic' },
-  { id: 'examples',          label: '  Full examples' },
-  { id: 'indicator-ref',     label: 'Indicator Reference' },
+  { id: 'getting-started', label: 'Getting Started'       },
+  { id: 'dsl-overview',    label: 'DSL Overview'          },
+  { id: 'candle-refs',     label: '  Candle references'   },
+  { id: 'ohlc-fields',     label: '  OHLC & boolean fields'},
+  { id: 'arithmetic',      label: '  Arithmetic'           },
+  { id: 'operators',       label: '  Operators & logic'    },
+  { id: 'examples',        label: '  Full examples'        },
+  { id: 'indicator-ref',   label: 'Indicator Reference'   },
 ] as const;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,7 +83,6 @@ function Table({ headers, rows }: { headers: string[]; rows: React.ReactNode[][]
 function IndicatorCard({ ind }: { ind: Indicator }) {
   const params = Object.entries(ind.params);
 
-  // Build an example call string: funcName(param=default_or_value, ...)
   const exampleArgs = params
     .map(([name, info]) => {
       const val = info.default ?? (info.type === 'int' ? 14 : 2.0);
@@ -149,7 +148,6 @@ export default function Docs() {
               </button>
             </li>
           ))}
-          {/* Dynamic indicator entries */}
           {indicators.length > 0 && (
             <>
               <li style={s.tocDivider} />
@@ -171,7 +169,6 @@ export default function Docs() {
       {/* ── Content ────────────────────────────────────────────────────────── */}
       <article style={s.content}>
 
-        {/* ── Getting Started ──────────────────────────────────────────────── */}
         <Section id="getting-started" title="Getting Started">
           <P>
             WickWatch lets you define multi-candle patterns in a simple DSL,
@@ -189,7 +186,6 @@ export default function Docs() {
           />
         </Section>
 
-        {/* ── DSL Overview ─────────────────────────────────────────────────── */}
         <Section id="dsl-overview" title="DSL Reference">
           <P>
             The WickWatch DSL is a declarative condition language. Each pattern is a
@@ -197,7 +193,6 @@ export default function Docs() {
             between conditions acts as an implicit <Code>AND</Code>.
           </P>
 
-          {/* Candle references */}
           <SubSection id="candle-refs" title="Candle references">
             <P>
               Candles are referenced by index: <Code>c1</Code> is the most recent
@@ -214,7 +209,6 @@ export default function Docs() {
             />
           </SubSection>
 
-          {/* OHLC fields */}
           <SubSection id="ohlc-fields" title="OHLC & boolean fields">
             <P>Access candle data using dot notation:</P>
             <Table
@@ -232,7 +226,6 @@ export default function Docs() {
             />
           </SubSection>
 
-          {/* Arithmetic */}
           <SubSection id="arithmetic" title="Arithmetic expressions">
             <P>
               You can use <Code>+</Code>, <Code>-</Code>, <Code>*</Code>, <Code>/</Code>{' '}
@@ -249,7 +242,6 @@ export default function Docs() {
 `}</Block>
           </SubSection>
 
-          {/* Operators */}
           <SubSection id="operators" title="Operators & logic">
             <P>
               Comparison operators produce boolean results. Logical operators
@@ -292,7 +284,6 @@ c1.close > c2.open      # closes above prior open
 `}</Block>
           </SubSection>
 
-          {/* Examples */}
           <SubSection id="examples" title="Full examples">
             <P><strong>Hammer candle</strong> — long lower wick, small body near the top:</P>
             <Block>{`
@@ -326,7 +317,6 @@ c1.volume > avg_volume(candle=1, period=20) * 1.5
           </SubSection>
         </Section>
 
-        {/* ── Indicator Reference ───────────────────────────────────────────── */}
         <Section id="indicator-ref" title="Indicator Reference">
           <P>
             All indicators take a <Code>candle</Code> parameter (the candle index,
@@ -364,14 +354,14 @@ const s: Record<string, React.CSSProperties> = {
     maxHeight: '100vh',
     overflowY: 'auto',
     padding: '28px 0 28px 20px',
-    borderRight: '1px solid #1e1e2e',
+    borderRight: '1px solid var(--border-subtle)',
     flexShrink: 0,
   },
   tocTitle: {
     margin: '0 0 12px',
     fontSize: 11,
     fontWeight: 700,
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
   },
@@ -386,7 +376,7 @@ const s: Record<string, React.CSSProperties> = {
   tocLink: {
     background: 'none',
     border: 'none',
-    color: '#7878a8',
+    color: 'var(--text-faint)',
     fontSize: 12,
     padding: '4px 0',
     cursor: 'pointer',
@@ -396,12 +386,12 @@ const s: Record<string, React.CSSProperties> = {
   },
   tocLinkIndent: {
     paddingLeft: 12,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
     fontSize: 11,
   },
   tocDivider: {
     height: 1,
-    background: '#1e1e2e',
+    background: 'var(--border-subtle)',
     margin: '8px 0',
   },
 
@@ -426,20 +416,20 @@ const s: Record<string, React.CSSProperties> = {
     margin: '0 0 16px',
     fontSize: 22,
     fontWeight: 800,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     paddingBottom: 12,
-    borderBottom: '1px solid #2a2a3a',
+    borderBottom: '1px solid var(--border)',
   },
   h3: {
     margin: '0 0 10px',
     fontSize: 15,
     fontWeight: 700,
-    color: '#c0c0d8',
+    color: 'var(--text-muted)',
   },
   p: {
     margin: '0 0 12px',
     fontSize: 14,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     lineHeight: 1.7,
   },
 
@@ -447,22 +437,22 @@ const s: Record<string, React.CSSProperties> = {
   inlineCode: {
     fontFamily: '"JetBrains Mono", "Fira Code", monospace',
     fontSize: '0.85em',
-    background: '#1e1e30',
-    border: '1px solid #2a2a3a',
+    background: 'var(--accent-bg)',
+    border: '1px solid var(--border)',
     borderRadius: 3,
     padding: '1px 6px',
-    color: '#a5b4fc',
+    color: 'var(--accent-light)',
   },
   codeBlock: {
-    background: '#0f0f18',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-editor)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: '14px 18px',
     margin: '12px 0',
     overflow: 'auto',
     fontFamily: '"JetBrains Mono", "Fira Code", monospace',
     fontSize: 12.5,
-    color: '#c4c4e0',
+    color: 'var(--text-secondary)',
     lineHeight: 1.65,
   },
 
@@ -471,7 +461,7 @@ const s: Record<string, React.CSSProperties> = {
     overflowX: 'auto',
     margin: '12px 0',
     borderRadius: 8,
-    border: '1px solid #2a2a3a',
+    border: '1px solid var(--border)',
   },
   table: {
     width: '100%',
@@ -479,31 +469,31 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
   },
   th: {
-    background: '#1a1a24',
-    color: '#7878a8',
+    background: 'var(--bg-card)',
+    color: 'var(--text-faint)',
     fontWeight: 600,
     fontSize: 11,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
     padding: '10px 14px',
     textAlign: 'left' as const,
-    borderBottom: '1px solid #2a2a3a',
+    borderBottom: '1px solid var(--border)',
   },
   td: {
     padding: '9px 14px',
-    color: '#c0c0d8',
-    borderBottom: '1px solid #1e1e2e',
+    color: 'var(--text-muted)',
+    borderBottom: '1px solid var(--border-subtle)',
     verticalAlign: 'top' as const,
     lineHeight: 1.5,
   },
   trAlt: {
-    background: '#0d0d16',
+    background: 'var(--bg-alt)',
   },
 
   // Indicator cards
   indCard: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 10,
     padding: '20px 24px',
     marginBottom: 20,
@@ -518,17 +508,17 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: '"JetBrains Mono", monospace',
     fontSize: 16,
     fontWeight: 700,
-    color: '#a5b4fc',
+    color: 'var(--accent-light)',
   },
   indLabel: {
     fontSize: 12,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
     fontWeight: 500,
   },
   indDesc: {
     margin: '0 0 14px',
     fontSize: 13,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     lineHeight: 1.6,
   },
   exampleRow: {
@@ -541,34 +531,34 @@ const s: Record<string, React.CSSProperties> = {
   exampleLabel: {
     fontSize: 11,
     fontWeight: 700,
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
     flexShrink: 0,
   },
   exampleCode: {
     margin: 0,
-    background: '#0f0f18',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-editor)',
+    border: '1px solid var(--border)',
     borderRadius: 6,
     padding: '6px 14px',
     fontFamily: '"JetBrains Mono", "Fira Code", monospace',
     fontSize: 12,
-    color: '#6ee7b7',
+    color: 'var(--code-highlight)',
     overflowX: 'auto' as const,
   },
   typeChip: {
     display: 'inline-block',
-    background: '#1e1e30',
-    border: '1px solid #3a3a5a',
+    background: 'var(--accent-bg)',
+    border: '1px solid var(--border-mid)',
     borderRadius: 4,
     padding: '1px 7px',
     fontSize: 11,
-    color: '#7878a8',
+    color: 'var(--text-faint)',
     fontFamily: '"JetBrains Mono", monospace',
   },
   muted: {
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
     fontSize: 13,
   },
 };

@@ -4,6 +4,7 @@ import { getPatterns, getTickers, runBacktest } from '../api/client';
 import type { Candle } from '../api/client';
 import { useStore } from '../store';
 import CandleChart from '../components/CandleChart';
+import { chevron } from '../lib/theme';
 
 const today = () => new Date().toISOString().split('T')[0];
 const thirtyDaysAgo = () => {
@@ -20,10 +21,11 @@ interface BacktestForm {
 }
 
 export default function Backtest() {
-  const patterns = useStore((s) => s.patterns);
-  const tickers = useStore((s) => s.tickers);
+  const patterns    = useStore((s) => s.patterns);
+  const tickers     = useStore((s) => s.tickers);
   const setPatterns = useStore((s) => s.setPatterns);
-  const setTickers = useStore((s) => s.setTickers);
+  const setTickers  = useStore((s) => s.setTickers);
+  const theme       = useStore((s) => s.theme);
 
   const [form, setForm] = useState<BacktestForm>({
     pattern_id: '',
@@ -32,8 +34,8 @@ export default function Backtest() {
     to_date: today(),
   });
 
-  const [running, setRunning] = useState(false);
-  const [candles, setCandles] = useState<Candle[]>([]);
+  const [running, setRunning]       = useState(false);
+  const [candles, setCandles]       = useState<Candle[]>([]);
   const [matchCount, setMatchCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export default function Backtest() {
 
   const handleRun = async () => {
     if (!form.pattern_id) return toast.error('Select a pattern');
-    if (!form.ticker_id) return toast.error('Select a ticker');
+    if (!form.ticker_id)  return toast.error('Select a ticker');
 
     setRunning(true);
     setCandles([]);
@@ -56,9 +58,9 @@ export default function Backtest() {
     try {
       const result = await runBacktest({
         pattern_id: Number(form.pattern_id),
-        ticker_id: Number(form.ticker_id),
-        from_date: form.from_date,
-        to_date: form.to_date,
+        ticker_id:  Number(form.ticker_id),
+        from_date:  form.from_date,
+        to_date:    form.to_date,
       });
       setCandles(result.candles);
       setMatchCount(result.matches.length);
@@ -72,6 +74,21 @@ export default function Backtest() {
     } finally {
       setRunning(false);
     }
+  };
+
+  const selectStyle: React.CSSProperties = {
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    padding: '10px 36px 10px 14px',
+    outline: 'none',
+    cursor: 'pointer',
+    width: '100%',
+    backgroundImage: chevron(theme),
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
   };
 
   return (
@@ -88,15 +105,13 @@ export default function Backtest() {
           <div style={styles.formGroup}>
             <label style={styles.label}>Pattern</label>
             <select
-              style={styles.select}
+              style={selectStyle}
               value={form.pattern_id}
               onChange={(e) => setField('pattern_id', e.target.value)}
             >
               <option value="">— select pattern —</option>
               {patterns.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -104,15 +119,13 @@ export default function Backtest() {
           <div style={styles.formGroup}>
             <label style={styles.label}>Ticker</label>
             <select
-              style={styles.select}
+              style={selectStyle}
               value={form.ticker_id}
               onChange={(e) => setField('ticker_id', e.target.value)}
             >
               <option value="">— select ticker —</option>
               {tickers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.exchange}:{t.symbol}
-                </option>
+                <option key={t.id} value={t.id}>{t.exchange}:{t.symbol}</option>
               ))}
             </select>
             {tickers.length === 0 && (
@@ -147,10 +160,7 @@ export default function Backtest() {
           disabled={running}
         >
           {running ? (
-            <>
-              <span style={styles.btnSpinner} />
-              Running…
-            </>
+            <><span style={styles.btnSpinner} />Running…</>
           ) : (
             'Run Backtest'
           )}
@@ -161,11 +171,11 @@ export default function Backtest() {
         <div style={styles.summaryCard}>
           <span style={styles.summaryIcon}>◈</span>
           <span style={styles.summaryText}>
-            <strong style={{ color: matchCount > 0 ? '#22c55e' : '#9898b0' }}>
+            <strong style={{ color: matchCount > 0 ? 'var(--success)' : 'var(--text-dim)' }}>
               {matchCount} match{matchCount !== 1 ? 'es' : ''}
             </strong>{' '}
             found over{' '}
-            <strong style={{ color: '#a5b4fc' }}>{candles.length} candles</strong>
+            <strong style={{ color: 'var(--accent-light)' }}>{candles.length} candles</strong>
           </span>
         </div>
       )}
@@ -197,16 +207,16 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 22,
     fontWeight: 800,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
   },
   pageSubtitle: {
     margin: 0,
     fontSize: 13,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
   formCard: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     padding: '24px',
     display: 'flex',
@@ -226,36 +236,21 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 11,
     fontWeight: 700,
-    color: '#7878a8',
+    color: 'var(--text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
   },
   input: {
-    background: '#111118',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     fontSize: 13,
     padding: '10px 14px',
     outline: 'none',
   },
-  select: {
-    background: '#111118',
-    border: '1px solid #2a2a3a',
-    borderRadius: 8,
-    color: '#e8e8f0',
-    fontSize: 13,
-    padding: '10px 36px 10px 14px',
-    outline: 'none',
-    cursor: 'pointer',
-    width: '100%',
-    // Custom chevron replaces the native arrow removed by appearance:none in index.css
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237878a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-  },
   runBtn: {
-    background: '#6366f1',
+    background: 'var(--accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 8,
@@ -282,8 +277,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-block',
   },
   summaryCard: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 10,
     padding: '16px 20px',
     display: 'flex',
@@ -292,11 +287,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   summaryIcon: {
     fontSize: 20,
-    color: '#6366f1',
+    color: 'var(--accent)',
   },
   summaryText: {
     fontSize: 14,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
   },
   chartSection: {
     display: 'flex',
@@ -307,11 +302,11 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 15,
     fontWeight: 700,
-    color: '#c0c0d8',
+    color: 'var(--text-muted)',
   },
   hint: {
     margin: '4px 0 0',
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
 };

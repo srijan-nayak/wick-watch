@@ -6,6 +6,7 @@ import {
   Navigate,
   Outlet,
 } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { getAuthStatus } from './api/client';
 import { useStore } from './store';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -31,12 +32,32 @@ function RequireAuth() {
 
 function AppShell() {
   useWebSocket();
+  const theme = useStore((s) => s.theme);
+
+  // Sync data-theme attribute on <html> whenever the theme changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
     <div style={shellStyles.root}>
       <NavBar />
       <main style={shellStyles.main}>
         <Outlet />
       </main>
+      {/* Toaster here so it can react to theme */}
+      <Toaster
+        position="bottom-right"
+        theme={theme}
+        toastOptions={{
+          style: {
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
+            fontSize: '13px',
+          },
+        }}
+      />
     </div>
   );
 }
@@ -45,7 +66,7 @@ const shellStyles: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex',
     minHeight: '100vh',
-    background: '#0f0f13',
+    background: 'var(--bg-base)',
   },
   main: {
     flex: 1,
@@ -57,7 +78,13 @@ const shellStyles: Record<string, React.CSSProperties> = {
 
 function Bootstrap({ children }: { children: React.ReactNode }) {
   const setAuth = useStore((s) => s.setAuth);
+  const theme = useStore((s) => s.theme);
   const [ready, setReady] = useState(false);
+
+  // Apply theme immediately on mount (before auth check completes)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     getAuthStatus()
@@ -69,9 +96,7 @@ function Bootstrap({ children }: { children: React.ReactNode }) {
           });
         }
       })
-      .catch(() => {
-        // Backend unreachable — proceed unauthenticated
-      })
+      .catch(() => {})
       .finally(() => setReady(true));
   }, [setAuth]);
 
@@ -89,7 +114,7 @@ function Bootstrap({ children }: { children: React.ReactNode }) {
 const bootstrapStyles: Record<string, React.CSSProperties> = {
   splash: {
     minHeight: '100vh',
-    background: '#0f0f13',
+    background: 'var(--bg-base)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -97,8 +122,8 @@ const bootstrapStyles: Record<string, React.CSSProperties> = {
   spinner: {
     width: 32,
     height: 32,
-    border: '3px solid #2a2a3a',
-    borderTopColor: '#6366f1',
+    border: '3px solid var(--border)',
+    borderTopColor: 'var(--accent)',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },

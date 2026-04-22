@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Pattern, Ticker, Alert } from '../api/client';
 
+export type Theme = 'dark' | 'light';
+
 interface User {
   user_id: string;
   user_name: string;
@@ -20,6 +22,9 @@ interface WickWatchState {
 
   // Alerts – last 50, newest first
   alerts: Alert[];
+
+  // Theme
+  theme: Theme;
 }
 
 interface WickWatchActions {
@@ -30,9 +35,18 @@ interface WickWatchActions {
   setLiveRunning: (running: boolean) => void;
   addAlert: (alert: Alert) => void;
   clearAlerts: () => void;
+  toggleTheme: () => void;
 }
 
 export type WickWatchStore = WickWatchState & WickWatchActions;
+
+function loadTheme(): Theme {
+  try {
+    const stored = localStorage.getItem('ww-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch { /* ignore */ }
+  return 'dark';
+}
 
 export const useStore = create<WickWatchStore>((set) => ({
   // Initial state
@@ -42,6 +56,7 @@ export const useStore = create<WickWatchStore>((set) => ({
   tickers: [],
   isLiveRunning: false,
   alerts: [],
+  theme: loadTheme(),
 
   // Actions
   setAuth: (user) => set({ isAuthenticated: true, user }),
@@ -60,4 +75,11 @@ export const useStore = create<WickWatchStore>((set) => ({
     })),
 
   clearAlerts: () => set({ alerts: [] }),
+
+  toggleTheme: () =>
+    set((state) => {
+      const next: Theme = state.theme === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('ww-theme', next); } catch { /* ignore */ }
+      return { theme: next };
+    }),
 }));

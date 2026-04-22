@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "WickWatch backend placeholder — run npm run bundle:backend to build the real sidecar"

@@ -10,11 +10,12 @@ import {
 import type { Pattern, Indicator } from '../api/client';
 import { useStore } from '../store';
 import DslEditor from '../components/DslEditor';
+import { chevron } from '../lib/theme';
 
 const INTERVALS = [
-  { value: 'minute', label: '1 min' },
-  { value: '3minute', label: '3 min' },
-  { value: '5minute', label: '5 min' },
+  { value: 'minute',   label: '1 min'  },
+  { value: '3minute',  label: '3 min'  },
+  { value: '5minute',  label: '5 min'  },
   { value: '10minute', label: '10 min' },
   { value: '15minute', label: '15 min' },
   { value: '30minute', label: '30 min' },
@@ -24,12 +25,14 @@ const INTERVALS = [
 const EMPTY_FORM = { name: '', dsl: '', interval: 'minute' };
 
 export default function Patterns() {
-  const patterns = useStore((s) => s.patterns);
+  const patterns    = useStore((s) => s.patterns);
   const setPatterns = useStore((s) => s.setPatterns);
+  const theme       = useStore((s) => s.theme);
+
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const [form, setForm]             = useState(EMPTY_FORM);
+  const [saving, setSaving]         = useState(false);
 
   const loadPatterns = useCallback(async () => {
     try {
@@ -42,9 +45,7 @@ export default function Patterns() {
 
   useEffect(() => {
     loadPatterns();
-    getIndicators()
-      .then(setIndicators)
-      .catch(() => {});
+    getIndicators().then(setIndicators).catch(() => {});
   }, [loadPatterns]);
 
   const selectPattern = (p: Pattern) => {
@@ -58,21 +59,13 @@ export default function Patterns() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
-      toast.error('Pattern name is required');
-      return;
-    }
-    if (!form.dsl.trim()) {
-      toast.error('DSL expression is required');
-      return;
-    }
+    if (!form.name.trim()) { toast.error('Pattern name is required'); return; }
+    if (!form.dsl.trim())  { toast.error('DSL expression is required'); return; }
     setSaving(true);
     try {
       if (selectedId !== null) {
         const updated = await updatePattern(selectedId, {
-          name: form.name,
-          dsl: form.dsl,
-          interval: form.interval,
+          name: form.name, dsl: form.dsl, interval: form.interval,
         });
         setPatterns(patterns.map((p) => (p.id === selectedId ? updated : p)));
         toast.success('Pattern updated');
@@ -111,15 +104,28 @@ export default function Patterns() {
     }
   };
 
+  const selectStyle: React.CSSProperties = {
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--text-primary)',
+    fontSize: 14,
+    padding: '10px 36px 10px 14px',
+    outline: 'none',
+    cursor: 'pointer',
+    width: '100%',
+    backgroundImage: chevron(theme),
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+  };
+
   return (
     <div style={styles.root}>
       {/* Left panel */}
       <div style={styles.leftPanel}>
         <div style={styles.panelHeader}>
           <h2 style={styles.panelTitle}>Patterns</h2>
-          <button style={styles.newBtn} onClick={newPattern}>
-            + New
-          </button>
+          <button style={styles.newBtn} onClick={newPattern}>+ New</button>
         </div>
 
         <div style={styles.list}>
@@ -145,10 +151,7 @@ export default function Patterns() {
                     ...styles.toggleBtn,
                     ...(p.is_active ? styles.toggleBtnOn : {}),
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleActive(p);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleToggleActive(p); }}
                   title={p.is_active ? 'Deactivate' : 'Activate'}
                 >
                   {p.is_active ? 'ON' : 'OFF'}
@@ -185,14 +188,12 @@ export default function Patterns() {
         <div style={styles.formGroup}>
           <label style={styles.label}>Interval</label>
           <select
-            style={styles.select}
+            style={selectStyle}
             value={form.interval}
             onChange={(e) => setForm((f) => ({ ...f, interval: e.target.value }))}
           >
             {INTERVALS.map((iv) => (
-              <option key={iv.value} value={iv.value}>
-                {iv.label}
-              </option>
+              <option key={iv.value} value={iv.value}>{iv.label}</option>
             ))}
           </select>
         </div>
@@ -232,26 +233,26 @@ const styles: Record<string, React.CSSProperties> = {
   leftPanel: {
     width: 280,
     minWidth: 280,
-    borderRight: '1px solid #2a2a3a',
+    borderRight: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
-    background: '#111118',
+    background: 'var(--bg-input)',
   },
   panelHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '24px 20px 16px',
-    borderBottom: '1px solid #2a2a3a',
+    borderBottom: '1px solid var(--border)',
   },
   panelTitle: {
     margin: 0,
     fontSize: 16,
     fontWeight: 700,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
   },
   newBtn: {
-    background: '#6366f1',
+    background: 'var(--accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 6,
@@ -266,7 +267,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px',
   },
   emptyList: {
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
     fontSize: 13,
     textAlign: 'center',
     padding: '20px',
@@ -284,8 +285,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.12s',
   },
   patternItemActive: {
-    background: '#1e1e30',
-    border: '1px solid #3730a3',
+    background: 'var(--accent-bg)',
+    border: '1px solid var(--accent-border)',
   },
   patternMeta: {
     display: 'flex',
@@ -296,7 +297,7 @@ const styles: Record<string, React.CSSProperties> = {
   patternName: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#d0d0e8',
+    color: 'var(--text-secondary)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -304,11 +305,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   intervalBadge: {
     fontSize: 10,
-    background: '#1e1e38',
-    color: '#7878a8',
+    background: 'var(--interval-bg)',
+    color: 'var(--text-faint)',
     padding: '2px 6px',
     borderRadius: 4,
-    border: '1px solid #2a2a4a',
+    border: '1px solid var(--interval-border)',
     whiteSpace: 'nowrap',
   },
   patternActions: {
@@ -321,21 +322,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     padding: '3px 8px',
     borderRadius: 4,
-    border: '1px solid #3a3a5a',
+    border: '1px solid var(--border-mid)',
     background: 'transparent',
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
     cursor: 'pointer',
     letterSpacing: '0.05em',
   },
   toggleBtnOn: {
-    border: '1px solid #22c55e',
-    color: '#22c55e',
+    border: '1px solid var(--success)',
+    color: 'var(--success)',
   },
   deleteBtn: {
     background: 'transparent',
-    border: '1px solid #3a2a2a',
+    border: '1px solid var(--remove-border)',
     borderRadius: 4,
-    color: '#7a4040',
+    color: 'var(--remove-color)',
     cursor: 'pointer',
     fontSize: 16,
     lineHeight: 1,
@@ -358,7 +359,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 18,
     fontWeight: 700,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
   },
   formGroup: {
     display: 'flex',
@@ -368,41 +369,27 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#7878a8',
+    color: 'var(--text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
   },
   input: {
-    background: '#111118',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     fontSize: 14,
     padding: '10px 14px',
     outline: 'none',
   },
-  select: {
-    background: '#111118',
-    border: '1px solid #2a2a3a',
-    borderRadius: 8,
-    color: '#e8e8f0',
-    fontSize: 14,
-    padding: '10px 36px 10px 14px',
-    outline: 'none',
-    cursor: 'pointer',
-    width: '100%',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237878a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-  },
   dslHint: {
     margin: 0,
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
     lineHeight: 1.6,
   },
   saveBtn: {
-    background: '#6366f1',
+    background: 'var(--accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 8,

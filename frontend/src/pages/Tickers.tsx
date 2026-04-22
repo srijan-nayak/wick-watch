@@ -8,15 +8,17 @@ import {
 } from '../api/client';
 import type { Ticker } from '../api/client';
 import { useStore } from '../store';
+import { chevron } from '../lib/theme';
 
 export default function Tickers() {
-  const tickers = useStore((s) => s.tickers);
+  const tickers    = useStore((s) => s.tickers);
   const setTickers = useStore((s) => s.setTickers);
+  const theme      = useStore((s) => s.theme);
 
-  const [query, setQuery] = useState('');
-  const [exchange, setExchange] = useState('NSE');
+  const [query, setQuery]               = useState('');
+  const [exchange, setExchange]         = useState('NSE');
   const [searchResults, setSearchResults] = useState<{ symbol: string; name: string }[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching]       = useState(false);
 
   const loadTickers = useCallback(async () => {
     try {
@@ -27,9 +29,7 @@ export default function Tickers() {
     }
   }, [setTickers]);
 
-  useEffect(() => {
-    loadTickers();
-  }, [loadTickers]);
+  useEffect(() => { loadTickers(); }, [loadTickers]);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -46,13 +46,8 @@ export default function Tickers() {
   };
 
   const handleAdd = async (symbol: string) => {
-    const exists = tickers.some(
-      (t) => t.symbol === symbol && t.exchange === exchange,
-    );
-    if (exists) {
-      toast.info(`${exchange}:${symbol} is already tracked`);
-      return;
-    }
+    const exists = tickers.some((t) => t.symbol === symbol && t.exchange === exchange);
+    if (exists) { toast.info(`${exchange}:${symbol} is already tracked`); return; }
     try {
       const created = await createTicker({ symbol, exchange });
       setTickers([...tickers, created]);
@@ -74,6 +69,21 @@ export default function Tickers() {
     }
   };
 
+  const exchangeSelectStyle: React.CSSProperties = {
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    padding: '10px 32px 10px 12px',
+    outline: 'none',
+    cursor: 'pointer',
+    minWidth: 80,
+    backgroundImage: chevron(theme),
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px center',
+  };
+
   return (
     <div style={styles.root}>
       <div style={styles.header}>
@@ -88,7 +98,7 @@ export default function Tickers() {
         <h3 style={styles.sectionTitle}>Add Instrument</h3>
         <div style={styles.searchRow}>
           <select
-            style={styles.exchangeSelect}
+            style={exchangeSelectStyle}
             value={exchange}
             onChange={(e) => setExchange(e.target.value)}
           >
@@ -122,10 +132,7 @@ export default function Tickers() {
                     <span style={styles.instMeta}>{inst.name}</span>
                   )}
                 </div>
-                <button
-                  style={styles.addBtn}
-                  onClick={() => handleAdd(inst.symbol)}
-                >
+                <button style={styles.addBtn} onClick={() => handleAdd(inst.symbol)}>
                   + Add
                 </button>
               </div>
@@ -156,7 +163,7 @@ export default function Tickers() {
                 <span
                   style={{
                     ...styles.statusDot,
-                    background: t.is_active ? '#22c55e' : '#4a4a6a',
+                    background: t.is_active ? 'var(--success)' : 'var(--text-placeholder)',
                   }}
                 />
                 <button
@@ -192,16 +199,16 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 22,
     fontWeight: 800,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
   },
   pageSubtitle: {
     margin: 0,
     fontSize: 13,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
   searchCard: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     padding: '20px',
     display: 'flex',
@@ -212,49 +219,35 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 14,
     fontWeight: 700,
-    color: '#c0c0d8',
+    color: 'var(--text-muted)',
     display: 'flex',
     alignItems: 'center',
     gap: 8,
   },
   count: {
-    background: '#2a2a3a',
+    background: 'var(--badge-bg)',
     borderRadius: 10,
     padding: '1px 8px',
     fontSize: 11,
-    color: '#7878a8',
+    color: 'var(--badge-color)',
     fontWeight: 600,
   },
   searchRow: {
     display: 'flex',
     gap: 8,
   },
-  exchangeSelect: {
-    background: '#111118',
-    border: '1px solid #2a2a3a',
-    borderRadius: 8,
-    color: '#e8e8f0',
-    fontSize: 13,
-    padding: '10px 32px 10px 12px',
-    outline: 'none',
-    cursor: 'pointer',
-    minWidth: 80,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237878a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 10px center',
-  },
   searchInput: {
     flex: 1,
-    background: '#111118',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     fontSize: 13,
     padding: '10px 14px',
     outline: 'none',
   },
   searchBtn: {
-    background: '#6366f1',
+    background: 'var(--accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 8,
@@ -280,9 +273,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '10px 12px',
-    background: '#111118',
+    background: 'var(--bg-input)',
     borderRadius: 8,
-    border: '1px solid #1e1e2e',
+    border: '1px solid var(--border-subtle)',
   },
   instInfo: {
     display: 'flex',
@@ -292,16 +285,16 @@ const styles: Record<string, React.CSSProperties> = {
   instSymbol: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#d0d0e8',
+    color: 'var(--text-secondary)',
   },
   instMeta: {
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
   addBtn: {
     background: 'transparent',
-    border: '1px solid #6366f1',
-    color: '#a5b4fc',
+    border: '1px solid var(--accent)',
+    color: 'var(--accent-light)',
     borderRadius: 6,
     padding: '5px 12px',
     fontSize: 12,
@@ -309,8 +302,8 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   tickersCard: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     padding: '20px',
     display: 'flex',
@@ -320,7 +313,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyMsg: {
     margin: 0,
     fontSize: 13,
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
   },
   tickerList: {
     display: 'flex',
@@ -332,9 +325,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 16px',
-    background: '#111118',
+    background: 'var(--bg-input)',
     borderRadius: 8,
-    border: '1px solid #1e1e2e',
+    border: '1px solid var(--border-subtle)',
   },
   tickerInfo: {
     display: 'flex',
@@ -344,11 +337,11 @@ const styles: Record<string, React.CSSProperties> = {
   tickerSymbol: {
     fontSize: 14,
     fontWeight: 600,
-    color: '#d0d0e8',
+    color: 'var(--text-secondary)',
   },
   tickerExchange: {
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
   tickerActions: {
     display: 'flex',
@@ -362,8 +355,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   removeBtn: {
     background: 'transparent',
-    border: '1px solid #3a2a2a',
-    color: '#9a5a5a',
+    border: '1px solid var(--remove-border)',
+    color: 'var(--remove-color)',
     borderRadius: 6,
     padding: '5px 12px',
     fontSize: 12,

@@ -5,24 +5,22 @@ import { toast } from 'sonner';
 
 const NAV_ITEMS = [
   { to: '/patterns', label: 'Patterns', icon: '⟨/⟩' },
-  { to: '/tickers', label: 'Tickers', icon: '◈' },
-  { to: '/backtest', label: 'Backtest', icon: '↺' },
-  { to: '/live', label: 'Live', icon: '◉' },
-  { to: '/docs', label: 'Docs', icon: '?' },
+  { to: '/tickers',  label: 'Tickers',  icon: '◈'   },
+  { to: '/backtest', label: 'Backtest', icon: '↺'   },
+  { to: '/live',     label: 'Live',     icon: '◉'   },
+  { to: '/docs',     label: 'Docs',     icon: '?'   },
 ] as const;
 
 export default function NavBar() {
-  const navigate = useNavigate();
-  const user = useStore((s) => s.user);
-  const clearAuth = useStore((s) => s.clearAuth);
+  const navigate      = useNavigate();
+  const user          = useStore((s) => s.user);
+  const clearAuth     = useStore((s) => s.clearAuth);
   const isLiveRunning = useStore((s) => s.isLiveRunning);
+  const theme         = useStore((s) => s.theme);
+  const toggleTheme   = useStore((s) => s.toggleTheme);
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      // best-effort
-    }
+    try { await logout(); } catch { /* best-effort */ }
     clearAuth();
     navigate('/login');
     toast.success('Logged out');
@@ -55,6 +53,16 @@ export default function NavBar() {
         ))}
       </ul>
 
+      {/* Theme toggle */}
+      <button
+        style={styles.themeToggle}
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        <span style={styles.themeIcon}>{theme === 'dark' ? '☀' : '◑'}</span>
+        <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+      </button>
+
       <div style={styles.userSection}>
         {user && (
           <div style={styles.userName} title={user.user_id}>
@@ -73,8 +81,8 @@ const styles: Record<string, React.CSSProperties> = {
   nav: {
     width: 200,
     minWidth: 200,
-    background: '#12121a',
-    borderRight: '1px solid #2a2a3a',
+    background: 'var(--bg-nav)',
+    borderRight: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
     padding: '24px 0',
@@ -87,17 +95,17 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     padding: '0 20px 28px',
-    borderBottom: '1px solid #2a2a3a',
+    borderBottom: '1px solid var(--border)',
     marginBottom: 16,
   },
   logoIcon: {
     fontSize: 22,
-    color: '#6366f1',
+    color: 'var(--accent)',
   },
   logoText: {
     fontSize: 17,
     fontWeight: 700,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     letterSpacing: '0.02em',
   },
   navList: {
@@ -115,7 +123,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
     padding: '10px 12px',
     borderRadius: 8,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     textDecoration: 'none',
     fontSize: 14,
     fontWeight: 500,
@@ -123,8 +131,8 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
   },
   navLinkActive: {
-    background: '#1e1e30',
-    color: '#a5b4fc',
+    background: 'var(--bg-hover)',
+    color: 'var(--accent-light)',
   },
   navIcon: {
     fontSize: 16,
@@ -135,29 +143,49 @@ const styles: Record<string, React.CSSProperties> = {
     width: 7,
     height: 7,
     borderRadius: '50%',
-    background: '#22c55e',
+    background: 'var(--success)',
     marginLeft: 'auto',
-    boxShadow: '0 0 6px #22c55e',
+    boxShadow: '0 0 6px var(--success)',
+  },
+  themeToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    margin: '0 8px 8px',
+    padding: '9px 12px',
+    borderRadius: 8,
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--text-faint)',
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'border-color 0.15s, color 0.15s',
+  },
+  themeIcon: {
+    fontSize: 15,
+    width: 20,
+    textAlign: 'center',
   },
   userSection: {
     padding: '16px 20px',
-    borderTop: '1px solid #2a2a3a',
+    borderTop: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
   },
   userName: {
     fontSize: 12,
-    color: '#6868a0',
+    color: 'var(--text-ghost)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
   logoutBtn: {
     background: 'transparent',
-    border: '1px solid #2a2a3a',
+    border: '1px solid var(--border)',
     borderRadius: 6,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     fontSize: 12,
     padding: '6px 12px',
     cursor: 'pointer',

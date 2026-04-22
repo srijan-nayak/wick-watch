@@ -3,6 +3,7 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import type { editor, languages } from 'monaco-editor';
 import type { Indicator } from '../api/client';
 import { validateDsl } from '../api/client';
+import { useStore } from '../store';
 
 interface DslEditorProps {
   value: string;
@@ -13,9 +14,9 @@ interface DslEditorProps {
 
 const LANGUAGE_ID = 'wickwatch-dsl';
 const LINT_OWNER  = 'dsl-lint';
-const LINT_DELAY  = 600; // ms debounce before sending to backend
+const LINT_DELAY  = 600;
 
-const OHLC_FIELDS      = ['open', 'high', 'low', 'close', 'volume'];
+const OHLC_FIELDS       = ['open', 'high', 'low', 'close', 'volume'];
 const BOOL_PROPS        = ['is_green', 'is_red', 'is_doji'];
 const CANDLE_FIELDS     = [...OHLC_FIELDS, ...BOOL_PROPS];
 const KEYWORDS          = ['AND', 'OR'];
@@ -27,7 +28,6 @@ function buildTokensProvider(): languages.IMonarchLanguage {
     keywords: KEYWORDS,
     boolProps: BOOL_PROPS,
     ohlcFields: OHLC_FIELDS,
-
     tokenizer: {
       root: [
         [/#.*$/, 'comment'],
@@ -47,12 +47,14 @@ function buildTokensProvider(): languages.IMonarchLanguage {
 
 export default function DslEditor({ value, onChange, indicators, readOnly }: DslEditorProps) {
   const monaco = useMonaco();
-  const registeredRef          = useRef(false);
-  const completionDisposableRef = useRef<{ dispose: () => void } | null>(null);
-  const editorRef              = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const lintTimerRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const theme  = useStore((s) => s.theme);
 
-  // ── Language registration (once) ────────────────────────────────────────────
+  const registeredRef           = useRef(false);
+  const completionDisposableRef = useRef<{ dispose: () => void } | null>(null);
+  const editorRef               = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const lintTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Language + theme registration (once) ─────────────────────────────────────
   useEffect(() => {
     if (!monaco || registeredRef.current) return;
     registeredRef.current = true;
@@ -63,6 +65,7 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
 
     monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, buildTokensProvider());
 
+    // Dark theme
     monaco.editor.defineTheme('wickwatch-dark', {
       base: 'vs-dark',
       inherit: true,
@@ -71,24 +74,55 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
         { token: 'candle-ref', foreground: 'a5b4fc' },
         { token: 'bool-prop',  foreground: 'f9a8d4' },
         { token: 'ohlc-field', foreground: '6ee7b7' },
-        { token: 'keyword',    foreground: 'fbbf24', fontStyle: 'bold' },
+        { token: 'keyword',    foreground: 'fbbf24', fontStyle: 'bold'   },
         { token: 'number',     foreground: 'fb923c' },
         { token: 'operator',   foreground: 'e879f9' },
         { token: 'delimiter',  foreground: '94a3b8' },
         { token: 'identifier', foreground: '93c5fd' },
       ],
       colors: {
-        'editor.background':            '#0f0f18',
-        'editor.foreground':            '#c4c4e0',
+        'editor.background':              '#0f0f18',
+        'editor.foreground':              '#c4c4e0',
         'editor.lineHighlightBackground': '#1a1a28',
-        'editorLineNumber.foreground':  '#3a3a5a',
-        'editorCursor.foreground':      '#6366f1',
-        'editor.selectionBackground':   '#3730a350',
+        'editorLineNumber.foreground':    '#3a3a5a',
+        'editorCursor.foreground':        '#6366f1',
+        'editor.selectionBackground':     '#3730a350',
+      },
+    });
+
+    // Light theme
+    monaco.editor.defineTheme('wickwatch-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'comment',    foreground: '6b7280', fontStyle: 'italic' },
+        { token: 'candle-ref', foreground: '4f46e5' },
+        { token: 'bool-prop',  foreground: '9d174d' },
+        { token: 'ohlc-field', foreground: '065f46' },
+        { token: 'keyword',    foreground: '92400e', fontStyle: 'bold'   },
+        { token: 'number',     foreground: '9a3412' },
+        { token: 'operator',   foreground: '6d28d9' },
+        { token: 'delimiter',  foreground: '475569' },
+        { token: 'identifier', foreground: '1e40af' },
+      ],
+      colors: {
+        'editor.background':              '#f8f8fd',
+        'editor.foreground':              '#1a1a2e',
+        'editor.lineHighlightBackground': '#ededf8',
+        'editorLineNumber.foreground':    '#a0a0c0',
+        'editorCursor.foreground':        '#6366f1',
+        'editor.selectionBackground':     '#6366f120',
       },
     });
   }, [monaco]);
 
-  // ── Completion provider (refreshed when indicators change) ───────────────────
+  // ── Switch Monaco theme when user toggles ──────────────────────────────────
+  useEffect(() => {
+    if (!monaco) return;
+    monaco.editor.setTheme(theme === 'light' ? 'wickwatch-light' : 'wickwatch-dark');
+  }, [monaco, theme]);
+
+  // ── Completion provider (refreshed when indicators change) ─────────────────
   useEffect(() => {
     if (!monaco) return;
 
@@ -119,7 +153,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
             endColumn:       word.endColumn,
           };
 
-          // After a dot → suggest OHLC fields + bool props
           if (textBefore.match(/\b(c\d+)\.\s*$/)) {
             return {
               suggestions: CANDLE_FIELDS.map((f) => ({
@@ -137,7 +170,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
             };
           }
 
-          // After indicator name + '(' → param hints
           const indMatch = textBefore.match(
             new RegExp(`\\b(${indicatorNames.join('|')})\\(\\s*$`),
           );
@@ -157,7 +189,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
             }
           }
 
-          // After 'c' → suggest c1..c5
           if (textBefore.match(/\bc\s*$/)) {
             return {
               suggestions: CANDLE_SUGGESTIONS.map((c) => ({
@@ -171,7 +202,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
             };
           }
 
-          // Top-level: candles + keywords + indicators
           return {
             suggestions: [
               ...CANDLE_SUGGESTIONS.map((c) => ({
@@ -196,11 +226,10 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
     return () => { completionDisposableRef.current?.dispose(); };
   }, [monaco, indicators]);
 
-  // ── Linting: debounced call to /api/dsl/validate ─────────────────────────────
+  // ── Linting ────────────────────────────────────────────────────────────────
   const runLint = useCallback(
     (dsl: string) => {
       if (!monaco || !editorRef.current) return;
-
       if (lintTimerRef.current) clearTimeout(lintTimerRef.current);
 
       lintTimerRef.current = setTimeout(async () => {
@@ -215,7 +244,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
 
         try {
           const result = await validateDsl(trimmed);
-
           if (result.ok) {
             monaco.editor.setModelMarkers(model, LINT_OWNER, []);
           } else {
@@ -226,7 +254,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
                 startLineNumber: e.line,
                 startColumn:     e.col,
                 endLineNumber:   e.line,
-                // Underline to the end of the line
                 endColumn:       model.getLineLength(e.line) + 1,
                 message:         e.message,
                 severity:        monaco.MarkerSeverity.Error,
@@ -234,7 +261,6 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
             );
           }
         } catch {
-          // Backend not reachable — clear stale markers silently
           const model = editorRef.current?.getModel();
           if (model) monaco.editor.setModelMarkers(model, LINT_OWNER, []);
         }
@@ -243,17 +269,15 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
     [monaco],
   );
 
-  // Lint whenever the value changes externally (e.g., loading a saved pattern)
   useEffect(() => {
     runLint(value);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  // ── Editor mount ─────────────────────────────────────────────────────────────
+  // ── Editor mount ──────────────────────────────────────────────────────────
   const handleMount = (ed: editor.IStandaloneCodeEditor) => {
     editorRef.current = ed;
-    ed.updateOptions({ theme: 'wickwatch-dark' });
-    // Lint initial value
+    ed.updateOptions({ theme: theme === 'light' ? 'wickwatch-light' : 'wickwatch-dark' });
     runLint(ed.getValue());
   };
 
@@ -264,36 +288,32 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
   };
 
   return (
-    // overflow: visible so Monaco's suggest / hover widgets are not clipped
-    // when the cursor is near the bottom of the editor.
     <div style={styles.wrapper}>
       <Editor
         height="300px"
         language={LANGUAGE_ID}
-        theme="wickwatch-dark"
+        theme={theme === 'light' ? 'wickwatch-light' : 'wickwatch-dark'}
         value={value}
         onChange={handleChange}
         onMount={handleMount}
         options={{
-          minimap:               { enabled: false },
-          fontSize:              13,
-          fontFamily:            '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-          lineNumbers:           'on',
-          scrollBeyondLastLine:  false,
-          wordWrap:              'on',
-          readOnly:              readOnly ?? false,
-          padding:               { top: 12, bottom: 12 },
-          suggest:               { showWords: false },
-          quickSuggestions:      true,
-          automaticLayout:       true,
-          tabSize:               2,
-          renderLineHighlight:   'line',
-          cursorStyle:           'line',
-          lineDecorationsWidth:  8,
-          glyphMargin:           false,
-          // ↓ positions suggest / hover widgets using position:fixed so they
-          //   are not clipped by the overflow:hidden on the wrapper
-          fixedOverflowWidgets:  true,
+          minimap:              { enabled: false },
+          fontSize:             13,
+          fontFamily:           '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+          lineNumbers:          'on',
+          scrollBeyondLastLine: false,
+          wordWrap:             'on',
+          readOnly:             readOnly ?? false,
+          padding:              { top: 12, bottom: 12 },
+          suggest:              { showWords: false },
+          quickSuggestions:     true,
+          automaticLayout:      true,
+          tabSize:              2,
+          renderLineHighlight:  'line',
+          cursorStyle:          'line',
+          lineDecorationsWidth: 8,
+          glyphMargin:          false,
+          fixedOverflowWidgets: true,
         }}
       />
     </div>
@@ -302,9 +322,9 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    border:     '1px solid #2a2a3a',
+    border:       '1px solid var(--border)',
     borderRadius: 8,
-    overflow:   'hidden',
-    background: '#0f0f18',
+    overflow:     'hidden',
+    background:   'var(--bg-editor)',
   },
 };

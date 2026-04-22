@@ -56,14 +56,14 @@ export default function Callback() {
 const styles: Record<string, React.CSSProperties> = {
   root: {
     minHeight: '100vh',
-    background: '#0f0f13',
+    background: 'var(--bg-base)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 16,
     padding: '48px 40px',
     display: 'flex',
@@ -75,14 +75,14 @@ const styles: Record<string, React.CSSProperties> = {
   spinner: {
     width: 40,
     height: 40,
-    border: '4px solid #2a2a3a',
-    borderTopColor: '#6366f1',
+    border: '4px solid var(--border)',
+    borderTopColor: 'var(--accent)',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
   message: {
     margin: 0,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     fontSize: 14,
     textAlign: 'center',
   },

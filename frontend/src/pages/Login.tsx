@@ -7,9 +7,15 @@ import { toast } from 'sonner';
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useStore((s) => s.setAuth);
+  const theme = useStore((s) => s.theme);
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Apply theme on public pages too
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const stopPolling = () => {
     if (pollRef.current !== null) {
@@ -41,9 +47,7 @@ export default function Login() {
     setLoading(true);
     try {
       const { url } = await getLoginUrl();
-
       window.open(url, '_blank');
-
       startPolling();
       toast.info('Complete login in your browser, then return here.');
     } catch (err) {
@@ -93,14 +97,14 @@ export default function Login() {
 const styles: Record<string, React.CSSProperties> = {
   root: {
     minHeight: '100vh',
-    background: '#0f0f13',
+    background: 'var(--bg-base)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 16,
     padding: '48px 40px',
     width: 360,
@@ -108,7 +112,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: 20,
-    boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+    boxShadow: '0 24px 60px rgba(0,0,0,0.15)',
   },
   logoRow: {
     display: 'flex',
@@ -117,22 +121,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   logoIcon: {
     fontSize: 36,
-    color: '#6366f1',
+    color: 'var(--accent)',
   },
   title: {
     margin: 0,
     fontSize: 28,
     fontWeight: 800,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
     letterSpacing: '-0.02em',
   },
   subtitle: {
     margin: 0,
-    color: '#6868a0',
+    color: 'var(--text-ghost)',
     fontSize: 14,
   },
   loginBtn: {
-    background: '#6366f1',
+    background: 'var(--accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 10,
@@ -145,7 +149,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.01em',
   },
   loginBtnDisabled: {
-    background: '#4338ca',
+    background: 'var(--accent-dark)',
     cursor: 'not-allowed',
     opacity: 0.7,
   },
@@ -158,21 +162,21 @@ const styles: Record<string, React.CSSProperties> = {
   spinner: {
     width: 24,
     height: 24,
-    border: '3px solid #2a2a3a',
-    borderTopColor: '#6366f1',
+    border: '3px solid var(--border)',
+    borderTopColor: 'var(--accent)',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
   hintText: {
     margin: 0,
-    color: '#9898b0',
+    color: 'var(--text-dim)',
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 1.5,
   },
   hint: {
     margin: 0,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
     fontSize: 12,
     textAlign: 'center',
   },

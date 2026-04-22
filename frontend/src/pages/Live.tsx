@@ -69,17 +69,13 @@ export default function Live() {
     }
   }, [setLiveRunning]);
 
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
   const handleStart = async () => {
-    // Request notification permission on this user gesture so the browser allows it
     if (notifPerm === 'default') {
       const granted = await requestNotificationPermission();
       setNotifPerm(granted ? 'granted' : 'denied');
     }
-    // Warm up the AudioContext (requires a user gesture on some browsers)
     playAlertChime();
 
     try {
@@ -101,60 +97,69 @@ export default function Live() {
     }
   };
 
+  const notifBorderColor =
+    notifPerm === 'granted' ? 'var(--success-border)' :
+    notifPerm === 'denied'  ? 'var(--danger-border)'  :
+    'var(--border)';
+  const notifTextColor =
+    notifPerm === 'granted' ? 'var(--success)' :
+    notifPerm === 'denied'  ? 'var(--danger)'  :
+    'var(--text-dim)';
+  const notifLabel =
+    notifPerm === 'granted' ? '🔔 Notifications on' :
+    notifPerm === 'denied'  ? '🔕 Notifications blocked' :
+    '🔔 Notifications';
+
   return (
     <div style={styles.root}>
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.titleRow}>
           <h1 style={styles.pageTitle}>Live Detection</h1>
+
           <div style={styles.statusBadge}>
             <div
               style={{
                 ...styles.statusDot,
-                background: isLiveRunning ? '#22c55e' : '#4a4a6a',
-                boxShadow: isLiveRunning ? '0 0 8px #22c55e' : 'none',
+                background: isLiveRunning ? 'var(--success)' : 'var(--text-placeholder)',
+                boxShadow: isLiveRunning ? '0 0 8px var(--success)' : 'none',
               }}
             />
             <span
               style={{
                 ...styles.statusLabel,
-                color: isLiveRunning ? '#22c55e' : '#6868a0',
+                color: isLiveRunning ? 'var(--success)' : 'var(--text-ghost)',
               }}
             >
               {isLiveRunning ? 'Running' : 'Stopped'}
             </span>
           </div>
 
-          {/* Notification permission badge */}
           {notifPerm !== 'unsupported' && (
             <div
               style={{
                 ...styles.notifBadge,
-                borderColor: notifPerm === 'granted' ? '#166534' : notifPerm === 'denied' ? '#7f1d1d' : '#3a3a2a',
-                color: notifPerm === 'granted' ? '#4ade80' : notifPerm === 'denied' ? '#f87171' : '#a0a020',
+                borderColor: notifBorderColor,
+                color: notifTextColor,
               }}
               title={
                 notifPerm === 'granted'
                   ? 'Browser notifications enabled'
                   : notifPerm === 'denied'
-                  ? 'Browser notifications blocked — allow them in your browser settings'
+                  ? 'Notifications blocked — allow them in browser settings'
                   : 'Notifications will be requested when you start detection'
               }
             >
-              {notifPerm === 'granted' ? '🔔 Notifications on' : notifPerm === 'denied' ? '🔕 Notifications blocked' : '🔔 Notifications'}
+              {notifLabel}
             </div>
           )}
         </div>
 
         <div style={styles.controls}>
           {isLiveRunning ? (
-            <button style={styles.stopBtn} onClick={handleStop}>
-              ■ Stop
-            </button>
+            <button style={styles.stopBtn} onClick={handleStop}>■ Stop</button>
           ) : (
-            <button style={styles.startBtn} onClick={handleStart}>
-              ▶ Start
-            </button>
+            <button style={styles.startBtn} onClick={handleStart}>▶ Start</button>
           )}
         </div>
       </div>
@@ -167,9 +172,7 @@ export default function Live() {
             <span style={styles.alertCount}>{alerts.length}</span>
           </h3>
           {alerts.length > 0 && (
-            <button style={styles.clearBtn} onClick={clearAlerts}>
-              Clear all
-            </button>
+            <button style={styles.clearBtn} onClick={clearAlerts}>Clear all</button>
           )}
         </div>
 
@@ -185,7 +188,6 @@ export default function Live() {
         ) : (
           <div style={styles.alertList}>
             {alerts.map((alert, i) => (
-              // Key uses index + triggered_at for uniqueness
               <AlertRow key={`${alert.pattern}-${alert.triggered_at}-${i}`} alert={alert} />
             ))}
           </div>
@@ -212,19 +214,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 16,
+    flexWrap: 'wrap',
   },
   pageTitle: {
     margin: 0,
     fontSize: 22,
     fontWeight: 800,
-    color: '#e8e8f0',
+    color: 'var(--text-primary)',
   },
   statusBadge: {
     display: 'flex',
     alignItems: 'center',
     gap: 7,
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 20,
     padding: '5px 14px',
   },
@@ -253,9 +256,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   startBtn: {
-    background: '#166534',
-    border: '1px solid #22c55e',
-    color: '#22c55e',
+    background: 'var(--success-bg)',
+    border: '1px solid var(--success-border)',
+    color: 'var(--success)',
     borderRadius: 8,
     padding: '11px 24px',
     fontSize: 14,
@@ -264,9 +267,9 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.03em',
   },
   stopBtn: {
-    background: '#7f1d1d',
-    border: '1px solid #ef4444',
-    color: '#ef4444',
+    background: 'var(--danger-bg)',
+    border: '1px solid var(--danger-border)',
+    color: 'var(--danger)',
     borderRadius: 8,
     padding: '11px 24px',
     fontSize: 14,
@@ -275,8 +278,8 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.03em',
   },
   feedSection: {
-    background: '#1a1a24',
-    border: '1px solid #2a2a3a',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     overflow: 'hidden',
     display: 'flex',
@@ -287,29 +290,29 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '16px 20px',
-    borderBottom: '1px solid #2a2a3a',
+    borderBottom: '1px solid var(--border)',
   },
   feedTitle: {
     margin: 0,
     fontSize: 14,
     fontWeight: 700,
-    color: '#c0c0d8',
+    color: 'var(--text-muted)',
     display: 'flex',
     alignItems: 'center',
     gap: 8,
   },
   alertCount: {
-    background: '#2a2a3a',
+    background: 'var(--badge-bg)',
     borderRadius: 10,
     padding: '1px 8px',
     fontSize: 11,
-    color: '#7878a8',
+    color: 'var(--badge-color)',
     fontWeight: 600,
   },
   clearBtn: {
     background: 'transparent',
-    border: '1px solid #3a2a2a',
-    color: '#7a5a5a',
+    border: '1px solid var(--remove-border)',
+    color: 'var(--remove-color)',
     borderRadius: 6,
     padding: '5px 12px',
     fontSize: 11,
@@ -325,11 +328,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   emptyIcon: {
     fontSize: 28,
-    color: '#2a2a4a',
+    color: 'var(--border)',
   },
   emptyText: {
     margin: 0,
-    color: '#4a4a6a',
+    color: 'var(--text-placeholder)',
     fontSize: 13,
     textAlign: 'center',
   },
@@ -341,7 +344,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   alertItem: {
     display: 'flex',
-    borderBottom: '1px solid #1e1e2e',
+    borderBottom: '1px solid var(--border-subtle)',
   },
   alertAccent: {
     width: 4,
@@ -365,7 +368,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   alertTime: {
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
   alertMeta: {
     display: 'flex',
@@ -375,13 +378,13 @@ const styles: Record<string, React.CSSProperties> = {
   alertSymbol: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#d0d0e8',
+    color: 'var(--text-secondary)',
   },
   alertSep: {
-    color: '#3a3a5a',
+    color: 'var(--border-mid)',
   },
   alertCandleTime: {
     fontSize: 11,
-    color: '#5a5a7a',
+    color: 'var(--text-disabled)',
   },
 };

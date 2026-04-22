@@ -3,33 +3,123 @@
   box-sizing: border-box;
 }
 
+/* ─── Dark theme (default) ──────────────────────────────────────────────────── */
 :root {
-  --bg: #0f0f13;
-  --bg-card: #1a1a24;
-  --bg-input: #111118;
-  --border: #2a2a3a;
-  --text: #e8e8f0;
-  --text-muted: #9898b0;
-  --text-dim: #5a5a7a;
-  --accent: #6366f1;
-  --accent-light: #a5b4fc;
-  --success: #22c55e;
-  --danger: #ef4444;
-  --warning: #f59e0b;
+  color-scheme: dark;
 
+  /* Backgrounds */
+  --bg-base:    #0f0f13;
+  --bg-nav:     #12121a;
+  --bg-card:    #1a1a24;
+  --bg-input:   #111118;
+  --bg-editor:  #0f0f18;
+  --bg-hover:   #1e1e30;
+  --bg-alt:     #0d0d16;
+
+  /* Borders */
+  --border:         #2a2a3a;
+  --border-subtle:  #1e1e2e;
+  --border-mid:     #3a3a5a;
+  --border-accent:  #3730a3;
+
+  /* Text */
+  --text-primary:     #e8e8f0;
+  --text-secondary:   #d0d0e8;
+  --text-muted:       #c0c0d8;
+  --text-dim:         #9898b0;
+  --text-faint:       #7878a8;
+  --text-ghost:       #6868a0;
+  --text-disabled:    #5a5a7a;
+  --text-placeholder: #4a4a6a;
+
+  /* Accent (indigo) */
+  --accent:        #6366f1;
+  --accent-light:  #a5b4fc;
+  --accent-bg:     #1e1e30;
+  --accent-border: #3730a3;
+  --accent-dark:   #4338ca;
+
+  /* Success */
+  --success:        #22c55e;
+  --success-bg:     #166534;
+  --success-border: #22c55e;
+
+  /* Danger */
+  --danger:        #ef4444;
+  --danger-bg:     #7f1d1d;
+  --danger-border: #ef4444;
+
+  /* Misc UI */
+  --badge-bg:         #2a2a3a;
+  --badge-color:      #7878a8;
+  --remove-border:    #3a2a2a;
+  --remove-color:     #9a5a5a;
+  --code-highlight:   #6ee7b7;
+  --interval-bg:      #1e1e38;
+  --interval-border:  #2a2a4a;
+
+  /* Typography */
   --sans: system-ui, 'Inter', 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
-  color-scheme: dark;
+  color: var(--text-primary);
+  background: var(--bg-base);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Light theme override ──────────────────────────────────────────────────── */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base:    #f0f0f8;
+  --bg-nav:     #ffffff;
+  --bg-card:    #ffffff;
+  --bg-input:   #f5f5fc;
+  --bg-editor:  #f8f8fd;
+  --bg-hover:   #ededf8;
+  --bg-alt:     #f5f5fc;
+
+  --border:         #dddde8;
+  --border-subtle:  #e8e8f3;
+  --border-mid:     #c8c8e0;
+  --border-accent:  #c7d2fe;
+
+  --text-primary:     #1a1a2e;
+  --text-secondary:   #2a2a48;
+  --text-muted:       #404065;
+  --text-dim:         #606080;
+  --text-faint:       #808098;
+  --text-ghost:       #9898b8;
+  --text-disabled:    #a8a8c0;
+  --text-placeholder: #b8b8d0;
+
+  --accent:        #6366f1;
+  --accent-light:  #6366f1;
+  --accent-bg:     #ededff;
+  --accent-border: #c7d2fe;
+  --accent-dark:   #4338ca;
+
+  --success:        #16a34a;
+  --success-bg:     #dcfce7;
+  --success-border: #86efac;
+
+  --danger:        #dc2626;
+  --danger-bg:     #fee2e2;
+  --danger-border: #fca5a5;
+
+  --badge-bg:        #ededf5;
+  --badge-color:     #6060a0;
+  --remove-border:   #fecaca;
+  --remove-color:    #dc2626;
+  --code-highlight:  #059669;
+  --interval-bg:     #ededf8;
+  --interval-border: #d8d8ee;
 }
 
 html, body {
@@ -56,22 +146,22 @@ html, body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a3a;
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a5a;
+  background: var(--border-mid);
 }
 
 /* ─── Code ──────────────────────────────────────────────────────────────────── */
 code {
   font-family: var(--mono);
   font-size: 0.85em;
-  background: #1e1e30;
-  border: 1px solid #2a2a3a;
+  background: var(--accent-bg);
+  border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 5px;
-  color: #a5b4fc;
+  color: var(--accent-light);
 }
 
 /* ─── Form elements ─────────────────────────────────────────────────────────── */
@@ -80,23 +170,24 @@ input, select, textarea, button {
 }
 
 button:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.08);
 }
 
 /* ─── WebKit select reset ───────────────────────────────────────────────────── */
-/* Without this, Safari / Tauri (WKWebView) ignores background-color on <select> */
 select {
   -webkit-appearance: none;
   appearance: none;
 }
 
 /* ─── WebKit date input ─────────────────────────────────────────────────────── */
-/* Style the inner calendar icon to match the dark theme */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.6) brightness(0.8);
   cursor: pointer;
 }
-/* Remove the default inner spin/clear buttons */
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.6;
+}
 input[type="date"]::-webkit-inner-spin-button,
 input[type="date"]::-webkit-clear-button {
   display: none;
@@ -104,6 +195,6 @@ input[type="date"]::-webkit-clear-button {
 
 /* ─── Selection ─────────────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(99, 102, 241, 0.3);
-  color: #e8e8f0;
+  background: rgba(99, 102, 241, 0.25);
+  color: var(--text-primary);
 }
