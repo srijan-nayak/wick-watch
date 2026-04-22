@@ -6,8 +6,11 @@ FROM node:22-alpine AS frontend
 WORKDIR /build/frontend
 
 # Install deps first for better layer caching
-COPY frontend/package*.json ./
-RUN npm ci --omit=optional
+# Use npm install (not npm ci) so npm resolves the correct platform-specific
+# native bindings for rolldown (Vite 8's bundler) on the build platform.
+# npm ci uses the macOS-generated lockfile which lacks linux-arm64-musl entries.
+COPY frontend/package.json ./
+RUN npm install
 
 # Copy source and build (plain web build — no Tauri toolchain needed)
 COPY frontend/ ./
