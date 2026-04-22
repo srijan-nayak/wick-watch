@@ -290,7 +290,7 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
   return (
     <div style={styles.wrapper}>
       <Editor
-        height="300px"
+        height="100%"
         language={LANGUAGE_ID}
         theme={theme === 'light' ? 'wickwatch-light' : 'wickwatch-dark'}
         value={value}
@@ -326,5 +326,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
     overflow:     'hidden',
     background:   'var(--bg-editor)',
+    // Fills the remaining viewport on tall screens; minHeight is the CSS floor
+    // (minHeight overrides height in CSS, so short viewports get 220px and scroll normally)
+    height:    'calc(100vh - 420px)',
+    minHeight: 220,
   },
 };

@@ -228,7 +228,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 0,
     height: '100%',
-    minHeight: '100vh',
   },
   leftPanel: {
     width: 280,
