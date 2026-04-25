@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from db.models import get_session, Pattern, Ticker
+from db.models import get_session, Pattern, Ticker, PatternMatch as _PatternMatch
 from dsl.parser import parse, ParseError
 from dsl.validator import validate, ValidationError
 from dsl.compiler import compile_pattern
@@ -65,6 +65,18 @@ async def run_backtest(
         raise HTTPException(502, f"Kite historical data error: {exc}")
 
     match_timestamps = run(compiled, df)
+    for ts in match_timestamps:
+        candle_dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        session.add(_PatternMatch(
+            pattern_id=pattern.id,
+            pattern_name=pattern.name,
+            interval=pattern.interval,
+            ticker_symbol=ticker.symbol,
+            exchange=ticker.exchange,
+            candle_time=candle_dt,
+            source="backtest",
+        ))
+    await session.commit()
     match_set = set(match_timestamps)
 
     candles = [

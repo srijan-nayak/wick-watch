@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 
-from db.models import get_session, Pattern, Ticker
+from db.models import get_session, Pattern, Ticker, PatternMatch, engine
+from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
 from dsl.parser import parse, ParseError
 from dsl.validator import validate, ValidationError
 from dsl.compiler import compile_pattern
@@ -147,17 +148,36 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         access_token=kite._kite.access_token,
     )
 
+    pattern_map = {p.name: p for p, _ in compiled_patterns}
+    ticker_map  = {t.instrument_token: t for t in active_tickers}
+
+    async def _handle_alert(name: str, token: int, symbol: str, ts) -> None:
+        await broadcast({
+            "type": "alert",
+            "pattern": name,
+            "instrument_token": token,
+            "symbol": symbol,
+            "candle_time": ts.isoformat(),
+        })
+        pat    = pattern_map.get(name)
+        ticker = ticker_map.get(token)
+        candle_dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        async with _AsyncSession(engine) as db:
+            db.add(PatternMatch(
+                pattern_id=pat.id if pat else None,
+                pattern_name=name,
+                interval=pat.interval if pat else "",
+                ticker_symbol=symbol,
+                exchange=ticker.exchange if ticker else "",
+                candle_time=candle_dt,
+                source="live",
+            ))
+            await db.commit()
+
     loop = asyncio.get_running_loop()
     stream.set_alert_callback(
         lambda name, token, symbol, ts: asyncio.run_coroutine_threadsafe(
-            broadcast({
-                "type": "alert",
-                "pattern": name,
-                "instrument_token": token,
-                "symbol": symbol,
-                "candle_time": ts.isoformat(),
-            }),
-            loop,
+            _handle_alert(name, token, symbol, ts), loop
         )
     )
 

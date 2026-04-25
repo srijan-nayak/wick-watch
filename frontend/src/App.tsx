@@ -20,6 +20,7 @@ import Backtest from './pages/Backtest';
 import Live from './pages/Live';
 import Docs from './pages/Docs';
 import Settings from './pages/Settings';
+import History from './pages/History';
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ export default function App() {
                 <Route path="/tickers" element={<ErrorBoundary><Tickers /></ErrorBoundary>} />
                 <Route path="/backtest" element={<ErrorBoundary><Backtest /></ErrorBoundary>} />
                 <Route path="/live" element={<ErrorBoundary><Live /></ErrorBoundary>} />
+                <Route path="/history" element={<ErrorBoundary><History /></ErrorBoundary>} />
                 <Route path="/docs"     element={<ErrorBoundary><Docs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
               </Route>

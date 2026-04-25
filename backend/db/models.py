@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import Field, SQLModel, create_engine, Session
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -54,6 +54,22 @@ class Alert(SQLModel, table=True):
     ticker_symbol: str
     candle_time: datetime
     triggered_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PatternMatch(SQLModel, table=True):
+    id:            Optional[int]  = Field(default=None, primary_key=True)
+    # Denormalised so records survive pattern/ticker deletion
+    pattern_id:    Optional[int]  = Field(default=None, foreign_key="pattern.id", index=True)
+    pattern_name:  str
+    interval:      str
+    ticker_symbol: str            = Field(index=True)
+    exchange:      str
+    candle_time:   datetime       # UTC — the candle whose close triggered the match
+    detected_at:   datetime       = Field(
+                                       default_factory=lambda: datetime.now(timezone.utc),
+                                       index=True,
+                                   )
+    source:        str            = Field(default="live", index=True)  # "live" | "backtest"
 
 
 async def create_db():

@@ -209,3 +209,44 @@ export const importData = (payload: unknown) =>
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+// ─── History ──────────────────────────────────────────────────────────────────
+
+export interface PatternMatchRecord {
+  id: number;
+  pattern_id: number | null;
+  pattern_name: string;
+  interval: string;
+  ticker_symbol: string;
+  exchange: string;
+  candle_time: string;
+  detected_at: string;
+  source: 'live' | 'backtest';
+}
+
+export interface HistoryPage {
+  items: PatternMatchRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export const getHistory = (params: {
+  page?: number;
+  page_size?: number;
+  pattern_id?: number | null;
+  ticker_symbol?: string;
+  source?: string;
+}) => {
+  const q = new URLSearchParams();
+  if (params.page)          q.set('page',          String(params.page));
+  if (params.page_size)     q.set('page_size',     String(params.page_size));
+  if (params.pattern_id)    q.set('pattern_id',    String(params.pattern_id));
+  if (params.ticker_symbol) q.set('ticker_symbol', params.ticker_symbol);
+  if (params.source)        q.set('source',        params.source);
+  return request<HistoryPage>(`/api/history?${q}`);
+};
+
+export const clearHistory = () =>
+  request<{ deleted: number }>('/api/history', { method: 'DELETE' });
