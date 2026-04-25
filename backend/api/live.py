@@ -22,15 +22,65 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/live")
 
-# Max concurrent Kite historical-data requests during seeding.
-_SEED_CONCURRENCY = 10
+# Kite's historical-data API is rate-limited to ~3 req/s per user.
+# We target 2.5 to stay safely under that limit.
+_KITE_RATE   = 2.5   # requests per second
+_MAX_RETRIES = 3     # retries on rate-limit responses before giving up
 
+
+# ── Token-bucket rate limiter ────────────────────────────────────────────────
+
+class _RateLimiter:
+    """
+    Simple async token-bucket. Allows at most `rate` acquire() calls per second.
+    Excess callers sleep just long enough to stay within the budget.
+    """
+    def __init__(self, rate: float) -> None:
+        self._rate    = rate
+        self._tokens  = rate       # start full so first requests are instant
+        self._updated = 0.0        # initialised on first acquire()
+        self._lock    = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            now = asyncio.get_running_loop().time()
+            if self._updated == 0.0:
+                self._updated = now
+            elapsed = now - self._updated
+            self._tokens  = min(self._rate, self._tokens + elapsed * self._rate)
+            self._updated = now
+
+            if self._tokens >= 1.0:
+                self._tokens -= 1.0
+            else:
+                wait = (1.0 - self._tokens) / self._rate
+                self._tokens  = 0.0
+                self._updated += wait
+                await asyncio.sleep(wait)
+
+
+# ── Error helpers ────────────────────────────────────────────────────────────
+
+def _is_rate_limited(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "too many" in msg or "429" in msg or "rate" in msg
+
+def _is_invalid_token(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        ("invalid" in msg and ("token" in msg or "instrument" in msg))
+        or "no data" in msg
+    )
+
+
+# ── Broadcast helper ─────────────────────────────────────────────────────────
 
 async def _log(level: str, message: str) -> None:
-    """Broadcast a structured log entry to all connected frontend clients."""
     log.info("[live/%s] %s", level, message)
     await broadcast({"type": "log", "level": level, "message": message})
 
+
+# ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/status")
 async def live_status():
@@ -70,8 +120,8 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         except (ParseError, ValidationError) as exc:
             raise HTTPException(422, f"Pattern '{p.name}' DSL error: {exc}")
 
-    # Group patterns by interval; track max lookback per interval so we fetch
-    # seed data once per (ticker, interval) instead of once per (ticker, pattern).
+    # One fetch per (ticker, interval) — use max lookback across patterns sharing
+    # the same interval so we never fetch the same data twice.
     interval_patterns: dict[str, list[tuple[Pattern, object]]] = defaultdict(list)
     interval_lookback: dict[str, int] = {}
     for pattern, compiled in compiled_patterns:
@@ -81,16 +131,15 @@ async def start_live(session: AsyncSession = Depends(get_session)):
             compiled.lookback,
         )
 
-    total_jobs = len(active_tickers) * len(interval_lookback)
+    total_jobs   = len(active_tickers) * len(interval_lookback)
     intervals_str = ", ".join(sorted(interval_lookback))
     await _log("info", (
         f"Starting live detection — {len(compiled_patterns)} pattern(s), "
         f"{len(active_tickers)} ticker(s), interval(s): {intervals_str}"
     ))
     await _log("info", (
-        f"Seeding {total_jobs} buffer(s) "
-        f"({len(active_tickers)} tickers × {len(interval_lookback)} interval(s)), "
-        f"concurrency={_SEED_CONCURRENCY}…"
+        f"Seeding {total_jobs} buffer(s) at {_KITE_RATE} req/s "
+        f"(~{total_jobs / _KITE_RATE:.0f}s estimated)…"
     ))
 
     stream = LiveStream(
@@ -112,13 +161,13 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         )
     )
 
-    # Shared progress counter (mutable via list so the closure can write it)
-    progress = [0]
-    progress_step = max(1, total_jobs // 10)   # emit ~10 progress updates
-    sem = asyncio.Semaphore(_SEED_CONCURRENCY)
+    limiter      = _RateLimiter(_KITE_RATE)
+    progress     = [0]
+    progress_step = max(1, total_jobs // 10)
 
     async def _fetch_seed(ticker: Ticker, interval: str, lookback: int):
-        async with sem:
+        for attempt in range(_MAX_RETRIES + 1):
+            await limiter.acquire()
             try:
                 result = await asyncio.to_thread(
                     kite.historical_data,
@@ -132,9 +181,25 @@ async def start_live(session: AsyncSession = Depends(get_session)):
                 if progress[0] % progress_step == 0 or progress[0] == total_jobs:
                     await _log("info", f"Seeding… {progress[0]}/{total_jobs} done")
                 return result
+
             except Exception as exc:
+                if _is_rate_limited(exc) and attempt < _MAX_RETRIES:
+                    backoff = 2 ** attempt   # 1 s, 2 s, 4 s
+                    await asyncio.sleep(backoff)
+                    continue  # retry — don't count as progress yet
+
+                # Final failure after retries (or a non-rate-limit error)
                 progress[0] += 1
-                await _log("warn", f"Could not seed {ticker.symbol} ({interval}): {exc}")
+                if progress[0] % progress_step == 0 or progress[0] == total_jobs:
+                    await _log("info", f"Seeding… {progress[0]}/{total_jobs} done")
+
+                if _is_invalid_token(exc):
+                    await _log("warn",
+                        f"Could not seed {ticker.symbol} ({interval}): "
+                        "invalid instrument token — remove and re-add this ticker")
+                else:
+                    await _log("warn",
+                        f"Could not seed {ticker.symbol} ({interval}): {exc}")
                 return None
 
     jobs = [
@@ -161,11 +226,8 @@ async def start_live(session: AsyncSession = Depends(get_session)):
             )
         seeded += 1
 
-    await _log(
-        "warn" if failed else "info",
-        f"Seeding complete — {seeded} seeded, {failed} failed"
-        + (f" ({failed} tickers have stale/invalid tokens — remove and re-add them)" if failed else ""),
-    )
+    summary = f"Seeding complete — {seeded} seeded, {failed} failed"
+    await _log("warn" if failed else "info", summary)
 
     stream.start()
     set_live_stream(stream)
