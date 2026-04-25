@@ -12,15 +12,20 @@ const WS_URL =
 const MAX_BACKOFF_MS = 30_000;
 
 interface WsMessage {
-  type: 'ping' | 'alert';
+  type: 'ping' | 'alert' | 'log';
+  // alert fields
   pattern?: string;
   symbol?: string;
   candle_time?: string;
+  // log fields
+  level?: 'info' | 'warn' | 'error';
+  message?: string;
 }
 
 export function useWebSocket() {
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const addAlert = useStore((s) => s.addAlert);
+  const addLog   = useStore((s) => s.addLog);
   const setLiveRunning = useStore((s) => s.setLiveRunning);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -56,12 +61,7 @@ export function useWebSocket() {
 
       if (msg.type === 'ping') return;
 
-      if (
-        msg.type === 'alert' &&
-        msg.pattern &&
-        msg.symbol &&
-        msg.candle_time
-      ) {
+      if (msg.type === 'alert' && msg.pattern && msg.symbol && msg.candle_time) {
         addAlert({
           pattern: msg.pattern,
           symbol: msg.symbol,
@@ -69,6 +69,14 @@ export function useWebSocket() {
           triggered_at: new Date().toISOString(),
         });
         fireAlert(msg.pattern, msg.symbol, msg.candle_time);
+      }
+
+      if (msg.type === 'log' && msg.level && msg.message) {
+        addLog({
+          ts: new Date().toISOString(),
+          level: msg.level,
+          message: msg.message,
+        });
       }
     };
 

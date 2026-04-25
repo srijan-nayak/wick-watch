@@ -8,6 +8,12 @@ interface User {
   user_name: string;
 }
 
+export interface LogEntry {
+  ts: string;                       // ISO timestamp (frontend-assigned)
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
 interface WickWatchState {
   // Auth
   isAuthenticated: boolean;
@@ -23,6 +29,9 @@ interface WickWatchState {
   // Alerts – last 50, newest first
   alerts: Alert[];
 
+  // Live detection logs – last 500, newest first
+  logs: LogEntry[];
+
   // Theme
   theme: Theme;
 }
@@ -35,6 +44,8 @@ interface WickWatchActions {
   setLiveRunning: (running: boolean) => void;
   addAlert: (alert: Alert) => void;
   clearAlerts: () => void;
+  addLog: (entry: LogEntry) => void;
+  clearLogs: () => void;
   toggleTheme: () => void;
 }
 
@@ -56,6 +67,7 @@ export const useStore = create<WickWatchStore>((set) => ({
   tickers: [],
   isLiveRunning: false,
   alerts: [],
+  logs: [],
   theme: loadTheme(),
 
   // Actions
@@ -75,6 +87,13 @@ export const useStore = create<WickWatchStore>((set) => ({
     })),
 
   clearAlerts: () => set({ alerts: [] }),
+
+  addLog: (entry) =>
+    set((state) => ({
+      logs: [entry, ...state.logs].slice(0, 500),
+    })),
+
+  clearLogs: () => set({ logs: [] }),
 
   toggleTheme: () =>
     set((state) => {

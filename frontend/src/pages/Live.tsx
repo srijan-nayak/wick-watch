@@ -1,13 +1,16 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getLiveStatus, startLive, stopLive } from '../api/client';
 import { useStore } from '../store';
 import type { Alert } from '../api/client';
+import type { LogEntry } from '../store';
 import {
   requestNotificationPermission,
   notificationPermission,
   playAlertChime,
 } from '../lib/alertNotify';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -17,6 +20,12 @@ function timeAgo(iso: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   return `${hrs}h ago`;
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-IN', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
 }
 
 const PATTERN_COLORS = [
@@ -29,6 +38,8 @@ function patternColor(name: string): string {
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   return PATTERN_COLORS[hash % PATTERN_COLORS.length];
 }
+
+// ─── Alert row ────────────────────────────────────────────────────────────────
 
 function AlertRow({ alert }: { alert: Alert }) {
   const color = patternColor(alert.pattern);
@@ -50,23 +61,76 @@ function AlertRow({ alert }: { alert: Alert }) {
   );
 }
 
+// ─── Log row ──────────────────────────────────────────────────────────────────
+
+const LOG_COLORS: Record<LogEntry['level'], string> = {
+  info:  'var(--text-dim)',
+  warn:  '#fb923c',
+  error: 'var(--danger)',
+};
+
+const LOG_PREFIX: Record<LogEntry['level'], string> = {
+  info:  'INFO',
+  warn:  'WARN',
+  error: 'ERR ',
+};
+
+function LogRow({ entry }: { entry: LogEntry }) {
+  return (
+    <div style={styles.logRow}>
+      <span style={styles.logTime}>{fmtTime(entry.ts)}</span>
+      <span style={{ ...styles.logLevel, color: LOG_COLORS[entry.level] }}>
+        {LOG_PREFIX[entry.level]}
+      </span>
+      <span style={{ ...styles.logMsg, color: LOG_COLORS[entry.level] }}>
+        {entry.message}
+      </span>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+type Tab = 'alerts' | 'logs';
+
 export default function Live() {
   const isLiveRunning = useStore((s) => s.isLiveRunning);
   const setLiveRunning = useStore((s) => s.setLiveRunning);
-  const alerts = useStore((s) => s.alerts);
-  const clearAlerts = useStore((s) => s.clearAlerts);
+  const alerts         = useStore((s) => s.alerts);
+  const clearAlerts    = useStore((s) => s.clearAlerts);
+  const logs           = useStore((s) => s.logs);
+  const clearLogs      = useStore((s) => s.clearLogs);
 
+  const [tab, setTab]   = useState<Tab>('alerts');
   const [notifPerm, setNotifPerm] = useState<ReturnType<typeof notificationPermission>>(
     () => notificationPermission(),
   );
+
+  // Auto-scroll the log pane to the bottom when new entries arrive
+  // (logs are newest-first in the store, but we reverse for display so the
+  //  newest line is at the bottom — classic terminal convention)
+  const logEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (tab === 'logs') {
+      logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs, tab]);
+
+  // Switch to the Logs tab automatically when seeding starts so the user
+  // can see progress without having to click manually
+  const prevLogCount = useRef(0);
+  useEffect(() => {
+    if (logs.length > prevLogCount.current && prevLogCount.current === 0) {
+      setTab('logs');
+    }
+    prevLogCount.current = logs.length;
+  }, [logs.length]);
 
   const fetchStatus = useCallback(async () => {
     try {
       const status = await getLiveStatus();
       setLiveRunning(status.running);
-    } catch {
-      // silently skip — backend may not be ready
-    }
+    } catch { /* swallow */ }
   }, [setLiveRunning]);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
@@ -77,6 +141,7 @@ export default function Live() {
       setNotifPerm(granted ? 'granted' : 'denied');
     }
     playAlertChime();
+    clearLogs();
 
     try {
       await startLive();
@@ -99,20 +164,21 @@ export default function Live() {
 
   const notifBorderColor =
     notifPerm === 'granted' ? 'var(--success-border)' :
-    notifPerm === 'denied'  ? 'var(--danger-border)'  :
-    'var(--border)';
+    notifPerm === 'denied'  ? 'var(--danger-border)'  : 'var(--border)';
   const notifTextColor =
     notifPerm === 'granted' ? 'var(--success)' :
-    notifPerm === 'denied'  ? 'var(--danger)'  :
-    'var(--text-dim)';
+    notifPerm === 'denied'  ? 'var(--danger)'  : 'var(--text-dim)';
   const notifLabel =
     notifPerm === 'granted' ? '🔔 Notifications on' :
-    notifPerm === 'denied'  ? '🔕 Notifications blocked' :
-    '🔔 Notifications';
+    notifPerm === 'denied'  ? '🔕 Notifications blocked' : '🔔 Notifications';
+
+  // Logs displayed oldest→newest (reverse of store order) for terminal feel
+  const logsAsc = [...logs].reverse();
+  const unreadLogs = logs.length;
 
   return (
     <div style={styles.root}>
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={styles.header}>
         <div style={styles.titleRow}>
           <h1 style={styles.pageTitle}>Live Detection</h1>
@@ -125,29 +191,21 @@ export default function Live() {
                 boxShadow: isLiveRunning ? '0 0 8px var(--success)' : 'none',
               }}
             />
-            <span
-              style={{
-                ...styles.statusLabel,
-                color: isLiveRunning ? 'var(--success)' : 'var(--text-ghost)',
-              }}
-            >
+            <span style={{
+              ...styles.statusLabel,
+              color: isLiveRunning ? 'var(--success)' : 'var(--text-ghost)',
+            }}>
               {isLiveRunning ? 'Running' : 'Stopped'}
             </span>
           </div>
 
           {notifPerm !== 'unsupported' && (
             <div
-              style={{
-                ...styles.notifBadge,
-                borderColor: notifBorderColor,
-                color: notifTextColor,
-              }}
+              style={{ ...styles.notifBadge, borderColor: notifBorderColor, color: notifTextColor }}
               title={
-                notifPerm === 'granted'
-                  ? 'Browser notifications enabled'
-                  : notifPerm === 'denied'
-                  ? 'Notifications blocked — allow them in browser settings'
-                  : 'Notifications will be requested when you start detection'
+                notifPerm === 'granted' ? 'Browser notifications enabled' :
+                notifPerm === 'denied'  ? 'Notifications blocked — allow them in browser settings' :
+                'Notifications will be requested when you start detection'
               }
             >
               {notifLabel}
@@ -164,38 +222,85 @@ export default function Live() {
         </div>
       </div>
 
-      {/* Alert feed */}
-      <div style={styles.feedSection}>
-        <div style={styles.feedHeader}>
-          <h3 style={styles.feedTitle}>
-            Recent Alerts
-            <span style={styles.alertCount}>{alerts.length}</span>
-          </h3>
-          {alerts.length > 0 && (
+      {/* ── Tabbed panel ── */}
+      <div style={styles.panel}>
+
+        {/* Tab bar */}
+        <div style={styles.tabBar}>
+          <button
+            style={{ ...styles.tab, ...(tab === 'alerts' ? styles.tabActive : {}) }}
+            onClick={() => setTab('alerts')}
+          >
+            Alerts
+            {alerts.length > 0 && (
+              <span style={styles.tabBadge}>{alerts.length}</span>
+            )}
+          </button>
+          <button
+            style={{ ...styles.tab, ...(tab === 'logs' ? styles.tabActive : {}) }}
+            onClick={() => setTab('logs')}
+          >
+            Logs
+            {unreadLogs > 0 && (
+              <span style={{
+                ...styles.tabBadge,
+                ...(tab !== 'logs' ? styles.tabBadgeUnread : {}),
+              }}>
+                {unreadLogs}
+              </span>
+            )}
+          </button>
+
+          {/* Clear button lives in the tab bar, context-sensitive */}
+          <div style={styles.tabBarSpacer} />
+          {tab === 'alerts' && alerts.length > 0 && (
             <button style={styles.clearBtn} onClick={clearAlerts}>Clear all</button>
+          )}
+          {tab === 'logs' && logs.length > 0 && (
+            <button style={styles.clearBtn} onClick={clearLogs}>Clear</button>
           )}
         </div>
 
-        {alerts.length === 0 ? (
-          <div style={styles.emptyFeed}>
-            <span style={styles.emptyIcon}>◉</span>
-            <p style={styles.emptyText}>
-              {isLiveRunning
-                ? 'Watching for pattern matches…'
-                : 'Start live detection to see alerts here.'}
-            </p>
-          </div>
-        ) : (
-          <div style={styles.alertList}>
-            {alerts.map((alert, i) => (
-              <AlertRow key={`${alert.pattern}-${alert.triggered_at}-${i}`} alert={alert} />
-            ))}
-          </div>
+        {/* ── Alerts tab ── */}
+        {tab === 'alerts' && (
+          alerts.length === 0 ? (
+            <div style={styles.emptyPane}>
+              <span style={styles.emptyIcon}>◉</span>
+              <p style={styles.emptyText}>
+                {isLiveRunning ? 'Watching for pattern matches…' : 'Start live detection to see alerts here.'}
+              </p>
+            </div>
+          ) : (
+            <div style={styles.alertList}>
+              {alerts.map((alert, i) => (
+                <AlertRow key={`${alert.pattern}-${alert.triggered_at}-${i}`} alert={alert} />
+              ))}
+            </div>
+          )
+        )}
+
+        {/* ── Logs tab ── */}
+        {tab === 'logs' && (
+          logs.length === 0 ? (
+            <div style={styles.emptyPane}>
+              <span style={styles.emptyIcon}>⬡</span>
+              <p style={styles.emptyText}>No logs yet — start live detection to see activity here.</p>
+            </div>
+          ) : (
+            <div style={styles.logPane}>
+              {logsAsc.map((entry, i) => (
+                <LogRow key={i} entry={entry} />
+              ))}
+              <div ref={logEndRef} />
+            </div>
+          )
         )}
       </div>
     </div>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
@@ -205,186 +310,114 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 28,
     maxWidth: 800,
   },
-  header: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  pageTitle: {
-    margin: 0,
-    fontSize: 22,
-    fontWeight: 800,
-    color: 'var(--text-primary)',
-  },
+
+  // Header
+  header: { display: 'flex', flexDirection: 'column', gap: 16 },
+  titleRow: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
+  pageTitle: { margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' },
   statusBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)',
-    borderRadius: 20,
-    padding: '5px 14px',
+    display: 'flex', alignItems: 'center', gap: 7,
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    borderRadius: 20, padding: '5px 14px',
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
+    width: 8, height: 8, borderRadius: '50%',
     transition: 'background 0.3s, box-shadow 0.3s',
   },
-  statusLabel: {
-    fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: '0.04em',
-  },
+  statusLabel: { fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' },
   notifBadge: {
-    fontSize: 11,
-    fontWeight: 600,
-    border: '1px solid',
-    borderRadius: 20,
-    padding: '4px 12px',
-    cursor: 'default',
-    letterSpacing: '0.02em',
+    fontSize: 11, fontWeight: 600, border: '1px solid',
+    borderRadius: 20, padding: '4px 12px', cursor: 'default', letterSpacing: '0.02em',
   },
-  controls: {
-    display: 'flex',
-    gap: 12,
-  },
+  controls: { display: 'flex', gap: 12 },
   startBtn: {
-    background: 'var(--success-bg)',
-    border: '1px solid var(--success-border)',
-    color: 'var(--success)',
-    borderRadius: 8,
-    padding: '11px 24px',
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-    letterSpacing: '0.03em',
+    background: 'var(--success-bg)', border: '1px solid var(--success-border)',
+    color: 'var(--success)', borderRadius: 8, padding: '11px 24px',
+    fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.03em',
   },
   stopBtn: {
-    background: 'var(--danger-bg)',
-    border: '1px solid var(--danger-border)',
-    color: 'var(--danger)',
-    borderRadius: 8,
-    padding: '11px 24px',
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-    letterSpacing: '0.03em',
+    background: 'var(--danger-bg)', border: '1px solid var(--danger-border)',
+    color: 'var(--danger)', borderRadius: 8, padding: '11px 24px',
+    fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.03em',
   },
-  feedSection: {
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)',
-    borderRadius: 12,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
+
+  // Tabbed panel
+  panel: {
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column',
   },
-  feedHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--border)',
+  tabBar: {
+    display: 'flex', alignItems: 'center', gap: 0,
+    borderBottom: '1px solid var(--border)', padding: '0 4px',
+    background: 'var(--bg-input)',
   },
-  feedTitle: {
-    margin: 0,
-    fontSize: 14,
-    fontWeight: 700,
-    color: 'var(--text-muted)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
+  tab: {
+    display: 'flex', alignItems: 'center', gap: 7,
+    padding: '12px 16px', fontSize: 13, fontWeight: 600,
+    color: 'var(--text-faint)', background: 'transparent',
+    border: 'none', borderBottom: '2px solid transparent',
+    cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s',
+    marginBottom: -1,
   },
-  alertCount: {
-    background: 'var(--badge-bg)',
-    borderRadius: 10,
-    padding: '1px 8px',
-    fontSize: 11,
-    color: 'var(--badge-color)',
-    fontWeight: 600,
+  tabActive: {
+    color: 'var(--accent-light)',
+    borderBottomColor: 'var(--accent)',
   },
+  tabBadge: {
+    background: 'var(--badge-bg)', borderRadius: 10,
+    padding: '1px 7px', fontSize: 10, color: 'var(--badge-color)', fontWeight: 700,
+  },
+  tabBadgeUnread: {
+    background: 'var(--accent)', color: '#fff',
+  },
+  tabBarSpacer: { flex: 1 },
   clearBtn: {
-    background: 'transparent',
-    border: '1px solid var(--remove-border)',
-    color: 'var(--remove-color)',
-    borderRadius: 6,
-    padding: '5px 12px',
-    fontSize: 11,
-    cursor: 'pointer',
+    background: 'transparent', border: '1px solid var(--remove-border)',
+    color: 'var(--remove-color)', borderRadius: 6,
+    padding: '4px 12px', fontSize: 11, cursor: 'pointer', marginRight: 8,
   },
-  emptyFeed: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: '48px 20px',
+
+  // Shared empty state
+  emptyPane: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', gap: 12, padding: '48px 20px',
   },
-  emptyIcon: {
-    fontSize: 28,
-    color: 'var(--border)',
+  emptyIcon: { fontSize: 28, color: 'var(--border)' },
+  emptyText: { margin: 0, color: 'var(--text-placeholder)', fontSize: 13, textAlign: 'center' },
+
+  // Alerts
+  alertList: { overflowY: 'auto', maxHeight: 520, display: 'flex', flexDirection: 'column' },
+  alertItem: { display: 'flex', borderBottom: '1px solid var(--border-subtle)' },
+  alertAccent: { width: 4, flexShrink: 0 },
+  alertBody: { flex: 1, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 4 },
+  alertTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  alertPattern: { fontSize: 13, fontWeight: 700 },
+  alertTime: { fontSize: 11, color: 'var(--text-disabled)' },
+  alertMeta: { display: 'flex', alignItems: 'center', gap: 6 },
+  alertSymbol: { fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' },
+  alertSep: { color: 'var(--border-mid)' },
+  alertCandleTime: { fontSize: 11, color: 'var(--text-disabled)' },
+
+  // Logs
+  logPane: {
+    overflowY: 'auto', maxHeight: 520,
+    padding: '8px 0',
+    fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+    display: 'flex', flexDirection: 'column',
   },
-  emptyText: {
-    margin: 0,
-    color: 'var(--text-placeholder)',
-    fontSize: 13,
-    textAlign: 'center',
+  logRow: {
+    display: 'flex', alignItems: 'baseline', gap: 10,
+    padding: '3px 16px',
+    fontSize: 12, lineHeight: 1.6,
   },
-  alertList: {
-    overflowY: 'auto',
-    maxHeight: 520,
-    display: 'flex',
-    flexDirection: 'column',
+  logTime: {
+    color: 'var(--text-placeholder)', flexShrink: 0, fontSize: 11,
   },
-  alertItem: {
-    display: 'flex',
-    borderBottom: '1px solid var(--border-subtle)',
+  logLevel: {
+    flexShrink: 0, fontWeight: 700, fontSize: 10,
+    letterSpacing: '0.05em', width: 32,
   },
-  alertAccent: {
-    width: 4,
-    flexShrink: 0,
-  },
-  alertBody: {
-    flex: 1,
-    padding: '12px 16px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  alertTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  alertPattern: {
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  alertTime: {
-    fontSize: 11,
-    color: 'var(--text-disabled)',
-  },
-  alertMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  alertSymbol: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-  },
-  alertSep: {
-    color: 'var(--border-mid)',
-  },
-  alertCandleTime: {
-    fontSize: 11,
-    color: 'var(--text-disabled)',
+  logMsg: {
+    flex: 1, wordBreak: 'break-word',
   },
 };
