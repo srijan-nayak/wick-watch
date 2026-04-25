@@ -11,6 +11,7 @@ const TOC = [
   { id: 'ohlc-fields',     label: '  OHLC & boolean fields'},
   { id: 'arithmetic',      label: '  Arithmetic'           },
   { id: 'operators',       label: '  Operators & logic'    },
+  { id: 'pivot-points',    label: '  Pivot points'         },
   { id: 'examples',        label: '  Full examples'        },
   { id: 'indicator-ref',   label: 'Indicator Reference'   },
 ] as const;
@@ -284,6 +285,42 @@ c1.close > c2.open      # closes above prior open
 `}</Block>
           </SubSection>
 
+          <SubSection id="pivot-points" title="Pivot points">
+            <P>
+              Pivot indicators compute the standard floor pivot levels from the{' '}
+              <strong>previous trading day's</strong> intraday candles (high = day high,
+              low = day low, close = last candle's close). Day boundaries are determined
+              in IST, so they reset correctly at midnight IST regardless of the chart interval.
+            </P>
+            <Table
+              headers={['Indicator', 'Formula', 'Description']}
+              rows={[
+                [<Code>pivot_pp</Code>,  '(H + L + C) / 3',          'Central pivot — balance level for the day'],
+                [<Code>pivot_r1</Code>,  '2×PP − L',                 'First resistance above PP'],
+                [<Code>pivot_r2</Code>,  'PP + (H − L)',              'Second resistance'],
+                [<Code>pivot_r3</Code>,  'H + 2×(PP − L)',           'Third resistance'],
+                [<Code>pivot_s1</Code>,  '2×PP − H',                 'First support below PP'],
+                [<Code>pivot_s2</Code>,  'PP − (H − L)',              'Second support'],
+                [<Code>pivot_s3</Code>,  'L − 2×(H − PP)',           'Third support'],
+              ]}
+            />
+            <P>
+              H, L, C refer to the previous day's high, low, and closing price.
+              All pivot indicators take a single <Code>candle</Code> parameter (default <Code>1</Code>).
+              Candles on the very first day of fetched data will produce NaN and be skipped automatically.
+            </P>
+            <Block>{`
+# Price bouncing off S1 with confirmation
+c1.low <= pivot_s1(candle=1)
+c1.close > pivot_s1(candle=1)
+c1.is_green
+
+# Breakout above R1 with volume
+c1.close > pivot_r1(candle=1)
+c1.volume > avg_volume(candle=1, period=10) * 1.5
+`}</Block>
+          </SubSection>
+
           <SubSection id="examples" title="Full examples">
             <P><strong>Hammer candle</strong> — long lower wick, small body near the top:</P>
             <Block>{`
@@ -313,6 +350,27 @@ ema(candle=1, period=9) > ema(candle=1, period=21)
             <Block>{`
 c1.close > bb_upper(candle=1, period=20, std=2.0)
 c1.volume > avg_volume(candle=1, period=20) * 1.5
+`}</Block>
+
+            <P><strong>Pivot S1 bounce</strong> — price dips to support then closes back above it:</P>
+            <Block>{`
+# Wick touched S1 but candle closed above it
+c1.low <= pivot_s1(candle=1)
+c1.close > pivot_s1(candle=1)
+c1.is_green
+
+# Prior candle was bearish (approaching from above)
+c2.is_red
+`}</Block>
+
+            <P><strong>Pivot PP rejection</strong> — two failed attempts to break above the pivot:</P>
+            <Block>{`
+# Both recent candles closed below PP after touching it
+c2.high >= pivot_pp(candle=2)
+c2.close < pivot_pp(candle=2)
+c1.high >= pivot_pp(candle=1)
+c1.close < pivot_pp(candle=1)
+c1.is_red
 `}</Block>
           </SubSection>
         </Section>

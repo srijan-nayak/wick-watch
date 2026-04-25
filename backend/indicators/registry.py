@@ -22,7 +22,80 @@ class Indicator:
     compute: Callable[[pd.DataFrame, dict[str, Any]], pd.Series]
 
 
+# ------------------------------------------------------------------ pivot helpers
+
+def _prev_day_ohlc(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    For each candle in df (UTC DatetimeIndex), derive the previous trading
+    day's High, Low, and Close (computed from all intraday candles of that day).
+
+    Trading days are determined in IST (Asia/Kolkata) so the day boundary is
+    always at midnight IST, not midnight UTC.
+
+    Returns three pd.Series (prev_high, prev_low, prev_close) aligned to df.index.
+    Candles on the first trading day in the slice get NaN — the executor treats
+    those as invalid windows and skips them.
+    """
+    # Map each UTC timestamp to its IST calendar date
+    ist_dates = df.index.tz_convert("Asia/Kolkata").normalize()
+
+    # Build an intraday frame indexed by IST date for grouping
+    intraday = pd.DataFrame(
+        {"high": df["high"].values, "low": df["low"].values, "close": df["close"].values},
+        index=ist_dates,
+    )
+
+    # Daily aggregation: true high, true low, last close of the day
+    daily = intraday.groupby(level=0).agg(
+        h=("high", "max"),
+        l=("low", "min"),
+        c=("close", "last"),
+    )
+
+    # Shift by one row so each date maps to the *previous* trading day
+    prev = daily.shift(1)
+
+    # Re-align to the original intraday index
+    aligned = prev.loc[ist_dates].set_index(df.index)
+    return aligned["h"], aligned["l"], aligned["c"]
+
+
 # ------------------------------------------------------------------ compute fns
+
+def _pivot_pp(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    return (h + l + c) / 3
+
+def _pivot_r1(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return 2 * pp - l
+
+def _pivot_r2(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return pp + (h - l)
+
+def _pivot_r3(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return h + 2 * (pp - l)
+
+def _pivot_s1(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return 2 * pp - h
+
+def _pivot_s2(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return pp - (h - l)
+
+def _pivot_s3(df: pd.DataFrame, p: dict) -> pd.Series:
+    h, l, c = _prev_day_ohlc(df)
+    pp = (h + l + c) / 3
+    return l - 2 * (h - pp)
+
 
 def _ema(df: pd.DataFrame, p: dict) -> pd.Series:
     return df["close"].ewm(span=p["period"], adjust=False).mean()
@@ -59,7 +132,67 @@ def _stoch(df: pd.DataFrame, p: dict):
 
 # ------------------------------------------------------------------ registry
 
+_PIVOT_LOOKBACK = 400   # covers one full trading day at 1-min resolution (375 candles)
+_PIVOT_PARAMS = {
+    "candle": Param(type=int, description="Candle index (1 = most recent)", default=1),
+}
+
 INDICATORS: dict[str, Indicator] = {
+    # ── Pivot points (standard floor pivot, previous-day basis) ──────────────
+    "pivot_pp": Indicator(
+        label="Pivot Point",
+        description=(
+            "Standard floor pivot point based on the previous trading day's candles. "
+            "PP = (prev_high + prev_low + prev_close) / 3. "
+            "Acts as the central balance level — price above PP is broadly bullish, below is bearish."
+        ),
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_pp,
+    ),
+    "pivot_r1": Indicator(
+        label="Pivot Resistance 1",
+        description="First resistance level above the pivot point. R1 = 2×PP − prev_low.",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_r1,
+    ),
+    "pivot_r2": Indicator(
+        label="Pivot Resistance 2",
+        description="Second resistance level. R2 = PP + (prev_high − prev_low).",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_r2,
+    ),
+    "pivot_r3": Indicator(
+        label="Pivot Resistance 3",
+        description="Third resistance level. R3 = prev_high + 2×(PP − prev_low).",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_r3,
+    ),
+    "pivot_s1": Indicator(
+        label="Pivot Support 1",
+        description="First support level below the pivot point. S1 = 2×PP − prev_high.",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_s1,
+    ),
+    "pivot_s2": Indicator(
+        label="Pivot Support 2",
+        description="Second support level. S2 = PP − (prev_high − prev_low).",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_s2,
+    ),
+    "pivot_s3": Indicator(
+        label="Pivot Support 3",
+        description="Third support level. S3 = prev_low − 2×(prev_high − PP).",
+        params=_PIVOT_PARAMS,
+        lookback=lambda p: _PIVOT_LOOKBACK,
+        compute=_pivot_s3,
+    ),
+
     "ema": Indicator(
         label="EMA",
         description="Exponential Moving Average of close price.",
