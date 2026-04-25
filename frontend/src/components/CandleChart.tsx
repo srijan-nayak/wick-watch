@@ -16,9 +16,13 @@ interface CandleChartProps {
   candles: Candle[];
 }
 
+// Kite returns IST timestamps (UTC+5:30). Lightweight-charts treats unix seconds as UTC,
+// so we add the IST offset to make the chart display IST wall-clock times correctly.
+const IST_OFFSET_S = 19800; // 5h30m in seconds
+
 function toTimestamp(timeStr: string): Time {
   const ms = Date.parse(timeStr);
-  if (!isNaN(ms)) return Math.floor(ms / 1000) as Time;
+  if (!isNaN(ms)) return (Math.floor(ms / 1000) + IST_OFFSET_S) as Time;
   return timeStr as Time;
 }
 

@@ -47,9 +47,13 @@ def from_kite_historical(records: list[dict]) -> pd.DataFrame:
     """
     Convert Kite historical candle records (list of dicts with date, open,
     high, low, close, volume) into a standard OHLCV DataFrame.
+
+    Kite returns IST-aware datetimes. We normalise to UTC so that isoformat()
+    always produces an unambiguous offset string (e.g. +05:30) that the
+    frontend can parse correctly.
     """
     df = pd.DataFrame(records)
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(df["date"], utc=True)
     df = df.set_index("date").sort_index()
     df = df[["open", "high", "low", "close", "volume"]]
     return df
