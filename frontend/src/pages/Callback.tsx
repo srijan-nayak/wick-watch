@@ -22,8 +22,12 @@ export default function Callback() {
               user_id: authStatus.user_id,
               user_name: authStatus.user_name ?? authStatus.user_id,
             });
-            toast.success(`Welcome, ${authStatus.user_name ?? authStatus.user_id}!`);
-            navigate('/patterns', { replace: true });
+            setMessage('Login successful! Returning to app…');
+            // This tab was opened by window.open() — close it so the
+            // original tab's polling detects auth and navigates there.
+            window.close();
+            // Fallback: if the browser blocks window.close() navigate here instead.
+            setTimeout(() => navigate('/patterns', { replace: true }), 500);
           } else {
             setMessage('Authentication not confirmed. Please try again.');
             setTimeout(() => navigate('/login', { replace: true }), 2500);
