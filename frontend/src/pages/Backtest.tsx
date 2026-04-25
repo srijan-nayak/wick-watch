@@ -4,7 +4,7 @@ import { getPatterns, getTickers, runBacktest } from '../api/client';
 import type { Candle } from '../api/client';
 import { useStore } from '../store';
 import CandleChart from '../components/CandleChart';
-import { chevron } from '../lib/theme';
+import SearchableSelect from '../components/SearchableSelect';
 
 const today = () => new Date().toISOString().split('T')[0];
 const thirtyDaysAgo = () => {
@@ -25,7 +25,6 @@ export default function Backtest() {
   const tickers     = useStore((s) => s.tickers);
   const setPatterns = useStore((s) => s.setPatterns);
   const setTickers  = useStore((s) => s.setTickers);
-  const theme       = useStore((s) => s.theme);
 
   const [form, setForm] = useState<BacktestForm>({
     pattern_id: '',
@@ -76,21 +75,6 @@ export default function Backtest() {
     }
   };
 
-  const selectStyle: React.CSSProperties = {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    padding: '10px 36px 10px 14px',
-    outline: 'none',
-    cursor: 'pointer',
-    width: '100%',
-    backgroundImage: chevron(theme),
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-  };
-
   return (
     <div style={styles.root}>
       <div style={styles.header}>
@@ -104,30 +88,31 @@ export default function Backtest() {
         <div style={styles.formGrid}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Pattern</label>
-            <select
-              style={selectStyle}
+            <SearchableSelect
+              options={patterns.map((p) => ({
+                value: String(p.id),
+                label: p.name,
+                sublabel: p.interval,
+              }))}
               value={form.pattern_id}
-              onChange={(e) => setField('pattern_id', e.target.value)}
-            >
-              <option value="">— select pattern —</option>
-              {patterns.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+              onChange={(v) => setField('pattern_id', v)}
+              placeholder="— select pattern —"
+            />
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Ticker</label>
-            <select
-              style={selectStyle}
+            <SearchableSelect
+              options={tickers.map((t) => ({
+                value: String(t.id),
+                label: t.symbol,
+                sublabel: t.exchange,
+              }))}
               value={form.ticker_id}
-              onChange={(e) => setField('ticker_id', e.target.value)}
-            >
-              <option value="">— select ticker —</option>
-              {tickers.map((t) => (
-                <option key={t.id} value={t.id}>{t.exchange}:{t.symbol}</option>
-              ))}
-            </select>
+              onChange={(v) => setField('ticker_id', v)}
+              placeholder="— select ticker —"
+              emptyMessage="No matching tickers"
+            />
             {tickers.length === 0 && (
               <p style={styles.hint}>No tickers yet — add them in the Tickers page.</p>
             )}
