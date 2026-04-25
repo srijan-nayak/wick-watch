@@ -3,77 +3,159 @@
 ## System overview
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Tauri Shell                │
-│  (Rust — manages window + sidecar process)  │
-│                                             │
-│  ┌─────────────────┐  ┌───────────────────┐ │
-│  │  React Frontend │  │  Python Backend   │ │
-│  │                 │◄─┤  (FastAPI sidecar)│ │
-│  │  Monaco Editor  │  │                   │ │
-│  │  TV LW Charts   │  │  Kite WebSocket   │ │
-│  │  Toast + Audio  │  │  Pattern Executor │ │
-│  └─────────────────┘  │  Indicator Reg.   │ │
-│                        │  SQLite DB        │ │
-│                        └───────────────────┘ │
-└─────────────────────────────────────────────┘
-                         │
-                    Kite API / WebSocket
-                    (Zerodha)
+┌─────────────────────────────────────────────────────┐
+│                     Tauri Shell                     │
+│     (Rust — manages window + sidecar process)       │
+│                                                     │
+│  ┌───────────────────┐  ┌─────────────────────────┐ │
+│  │  React Frontend   │  │    Python Backend        │ │
+│  │                   │◄─┤    (FastAPI sidecar)     │ │
+│  │  Monaco Editor    │  │                          │ │
+│  │  TV LW Charts     │  │  Kite WebSocket          │ │
+│  │  Toast + Audio    │  │  Pattern Executor        │ │
+│  │  Zustand store    │  │  Indicator Registry      │ │
+│  └───────────────────┘  │  SQLite DB               │ │
+│                          └─────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+                           │
+                      Kite API / WebSocket
+                      (Zerodha)
 ```
+
+In **web / Docker mode** the React build is served as static files by FastAPI directly — no Tauri shell involved.
+
+---
 
 ## Data flows
 
 ### Auth
 1. User clicks "Login with Kite"
-2. Frontend opens Kite OAuth URL in system browser
-3. Kite redirects to local callback URL (`localhost:PORT/auth/callback`)
-4. Backend exchanges code for access token, stores in SQLite
-5. Frontend polls for auth completion, proceeds to dashboard
+2. Frontend opens Kite OAuth URL in a new browser tab (`window.open`)
+3. Kite redirects to local callback URL (`/callback`)
+4. Backend exchanges request token for access token, stores in `UserSession` table
+5. Callback tab calls `window.close()` to dismiss itself; the opener tab detects auth completion and navigates to `/patterns`
 
 ### Backtest
-1. User submits pattern + ticker + date range
+1. User selects pattern + ticker + date range and submits
 2. Backend fetches historical candles from Kite REST API
-3. Compute lookback budget from pattern → fetch `window + lookback` candles
-4. Run pattern executor over sliding window → list of match timestamps
-5. Stream candle data + match points to frontend over WebSocket
-6. Frontend renders candlestick chart with match overlays
+3. Compute lookback budget from compiled pattern → fetch `window + lookback` extra candles
+4. Run pattern executor (`executor/engine.py`) over sliding window → list of match timestamps
+5. Return candle data + match timestamps to frontend as JSON
+6. Frontend renders interactive candlestick chart (TradingView) with match overlays
 
 ### Live detection
-1. On market open (or when user enables), backend subscribes to Kite WebSocket for all configured tickers
-2. Incoming ticks are aggregated into candles per configured interval (per pattern)
-3. On each new candle close, run all active patterns against all subscribed tickers
-4. On match: backend emits `{ type: "alert", pattern, ticker, candle_time }` over internal WebSocket
-5. Frontend receives event → shows toast + plays audio cue
+1. User clicks "Start" → `POST /api/live/start`
+2. Backend compiles all active patterns (fails fast on DSL errors)
+3. Groups patterns by interval; seeds each `(ticker, interval)` buffer with recent historical candles via Kite REST API — one fetch per pair, rate-limited to 2.5 req/s with exponential-backoff retry
+4. Seeding progress broadcast as `{"type":"log",...}` WebSocket messages to the Live → Logs tab
+5. After seeding, `LiveStream` subscribes to Kite WebSocket for all configured tickers
+6. Incoming ticks are aggregated into candles per interval by `executor/aggregator.py`
+7. On each new candle close, all matching patterns for that interval are evaluated
+8. On match: broadcast `{"type":"alert",...}` over `/ws` AND write a `PatternMatch` row to SQLite
+9. Frontend receives alert → shows toast + plays audio cue
+
+---
 
 ## Backend module responsibilities
 
 | Module | Responsibility |
 |---|---|
-| `indicators/registry.py` | Source of truth for all indicator definitions |
+| `indicators/registry.py` | Single source of truth for all indicator definitions (label, description, params, lookback fn, compute fn) |
 | `dsl/parser.py` | Tokenize + parse DSL text into an AST |
-| `dsl/validator.py` | Validate AST against indicator registry (param types, names) |
+| `dsl/validator.py` | Validate AST against indicator registry (param names, types) |
 | `dsl/compiler.py` | Walk AST → compute lookback budget, produce executable form |
-| `executor/engine.py` | Evaluate compiled pattern against a candle window |
-| `executor/aggregator.py` | Aggregate raw ticks → OHLCV candles by interval |
-| `kite/client.py` | Kite REST API wrapper (historical data, instrument list) |
-| `kite/stream.py` | Kite WebSocket tick stream handler |
-| `db/models.py` | SQLModel models: Pattern, Ticker, UserSession, Alert |
-| `api/routes.py` | FastAPI REST endpoints |
-| `api/ws.py` | FastAPI WebSocket endpoint for frontend communication |
+| `executor/engine.py` | Evaluate compiled pattern against a candle DataFrame window |
+| `executor/aggregator.py` | Aggregate raw ticks → OHLCV candles by interval; normalises timestamps to UTC |
+| `kite/client.py` | Kite REST API wrapper (historical data, instrument search) |
+| `kite/stream.py` | Kite WebSocket tick stream; deduplicates alerts against last-seen candle time |
+| `db/models.py` | SQLModel tables: Pattern, Ticker, UserSession, Alert, PatternMatch |
+| `api/routes.py` | REST endpoints: patterns, tickers, indicators |
+| `api/auth.py` | Kite OAuth login-url + callback + logout |
+| `api/backtest.py` | Single POST endpoint; fetches candles, runs executor, returns results |
+| `api/live.py` | Start/stop/status; seeding logic, rate limiter, alert handler |
+| `api/history.py` | Paginated `GET /history` (filters: pattern_id, ticker_symbol) + `DELETE /history` |
+| `api/data.py` | `GET /data/export` + `POST /data/import` for full data backup/restore |
+| `api/state.py` | Module-level singletons: KiteClient ref, LiveStream ref, running flag |
+| `api/ws.py` | `/ws` WebSocket endpoint + `broadcast()` helper |
 
-## Frontend module responsibilities
+---
 
-| Module | Responsibility |
+## Frontend page responsibilities
+
+| Page | Route | Responsibility |
+|---|---|---|
+| Login | `/login` | Shows "Login with Kite" button; opens OAuth URL via `window.open` |
+| Callback | `/callback` | Handles OAuth redirect; closes popup tab after successful auth |
+| Patterns | `/patterns` | Monaco editor for DSL; create / update / delete / activate patterns |
+| Tickers | `/tickers` | Instrument search (API or client-side filter); add/remove tickers |
+| Backtest | `/backtest` | SearchableSelect for pattern + ticker; date pickers; chart overlay |
+| Live | `/live` | Start/stop toggle; Alerts tab (real-time list); Logs tab (seeding progress) |
+| History | `/history` | Paginated `PatternMatch` table; SearchableSelect filters; fetches own data |
+| Docs | `/docs` | Sticky TOC; DSL reference; dynamic indicator cards from `GET /indicators` |
+| Settings | `/settings` | Export backup to JSON; import from JSON with dedup summary toast |
+
+---
+
+## Frontend component responsibilities
+
+| Component | Responsibility |
 |---|---|
-| `editor/` | Monaco Editor with custom DSL language + completion provider |
-| `charts/` | TradingView Lightweight Charts wrapper, backtest overlay renderer |
-| `live/` | WebSocket client, alert toast handler, audio cue |
-| `config/` | Pattern management UI, ticker config UI |
-| `auth/` | Login flow, session state |
+| `DslEditor` | Monaco Editor; custom DSL language; autocomplete on OHLC fields, indicators, and params; hover docs |
+| `CandleChart` | TradingView Lightweight Charts wrapper; match markers; IST time offset (`+19800s`) |
+| `SearchableSelect` | Combobox with live filter, keyboard nav, outside-click close |
+| `NavBar` | Sticky left sidebar; live-running dot on Live item; theme toggle; sign-out |
+| `ErrorBoundary` | Per-page boundary; prevents full-app crash on page errors |
+
+---
 
 ## Key invariants
+
 - Backtest and live detection use the **same executor** — `executor/engine.py` is the single pattern evaluation path
 - Frontend **never** hardcodes indicator names or params — all metadata comes from `GET /indicators`
 - Kite access token lives only in SQLite — never in frontend state or localStorage
 - Each pattern stores its **raw DSL text** in the DB; compilation happens at runtime
+- All timestamps stored in the DB are **UTC**; IST conversion is a display-layer concern
+- `PatternMatch` history records are written only from live detection, not from backtests
+- `create_all` on startup is non-destructive — existing tables and data are preserved
+
+---
+
+## Database schema
+
+```
+Pattern          Ticker              UserSession
+────────         ──────────          ─────────────
+id (PK)          id (PK)             id (PK)
+name             symbol              access_token
+dsl              exchange            user_id
+interval         instrument_token    user_name
+is_active        is_active           created_at
+created_at       added_at
+updated_at
+
+Alert            PatternMatch
+────────         ─────────────────────────────────
+id (PK)          id (PK)
+pattern_id (FK)  pattern_id (FK, nullable)
+ticker_symbol    pattern_name        ← denormalised
+candle_time      interval            ← denormalised
+triggered_at     ticker_symbol
+                 exchange
+                 candle_time (UTC)
+                 detected_at (UTC)
+```
+
+`PatternMatch` denormalises `pattern_name` and `interval` so records survive pattern deletion.
+
+---
+
+## Live detection rate limiting
+
+Kite historical API allows ~3 requests/second per user. With many tickers, naive parallel fetching causes HTTP 429 errors. The solution is a token-bucket rate limiter:
+
+```
+_RateLimiter(rate=2.5)      # 2.5 req/s — safely under the 3 req/s limit
+_MAX_RETRIES = 3             # on 429: retry with 2^attempt second backoff (1s, 2s, 4s)
+```
+
+Fetches are parallelised with `asyncio.gather` but each one must acquire a token before calling the Kite API. This gives maximum throughput without busting the rate limit.
