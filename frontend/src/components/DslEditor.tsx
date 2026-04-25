@@ -171,7 +171,7 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
           }
 
           const indMatch = textBefore.match(
-            new RegExp(`\\b(${indicatorNames.join('|')})\\(\\s*$`),
+            new RegExp(`\\b(${indicatorNames.join('|')})\\([^)]*$`),
           );
           if (indMatch) {
             const ind = indicators.find((i) => i.name === indMatch[1]);
