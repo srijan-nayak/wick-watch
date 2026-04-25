@@ -170,7 +170,6 @@ async def start_live(session: AsyncSession = Depends(get_session)):
                 ticker_symbol=symbol,
                 exchange=ticker.exchange if ticker else "",
                 candle_time=candle_dt,
-                source="live",
             ))
             await db.commit()
 

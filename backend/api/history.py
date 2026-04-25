@@ -17,7 +17,6 @@ async def get_history(
     page_size:     int           = Query(default=50, ge=1, le=200),
     pattern_id:    Optional[int] = Query(default=None),
     ticker_symbol: Optional[str] = Query(default=None),
-    source:        Optional[str] = Query(default=None),
     session:       AsyncSession  = Depends(get_session),
 ):
     count_q = sa_select(func.count(PatternMatch.id))
@@ -25,8 +24,6 @@ async def get_history(
         count_q = count_q.where(PatternMatch.pattern_id == pattern_id)
     if ticker_symbol:
         count_q = count_q.where(PatternMatch.ticker_symbol == ticker_symbol)
-    if source:
-        count_q = count_q.where(PatternMatch.source == source)
     total = (await session.execute(count_q)).scalar() or 0
 
     items_q = select(PatternMatch).order_by(PatternMatch.detected_at.desc())
@@ -34,8 +31,6 @@ async def get_history(
         items_q = items_q.where(PatternMatch.pattern_id == pattern_id)
     if ticker_symbol:
         items_q = items_q.where(PatternMatch.ticker_symbol == ticker_symbol)
-    if source:
-        items_q = items_q.where(PatternMatch.source == source)
     items_q = items_q.offset((page - 1) * page_size).limit(page_size)
     items = (await session.exec(items_q)).all()
 

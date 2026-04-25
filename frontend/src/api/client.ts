@@ -221,7 +221,6 @@ export interface PatternMatchRecord {
   exchange: string;
   candle_time: string;
   detected_at: string;
-  source: 'live' | 'backtest';
 }
 
 export interface HistoryPage {
@@ -237,14 +236,12 @@ export const getHistory = (params: {
   page_size?: number;
   pattern_id?: number | null;
   ticker_symbol?: string;
-  source?: string;
 }) => {
   const q = new URLSearchParams();
   if (params.page)          q.set('page',          String(params.page));
   if (params.page_size)     q.set('page_size',     String(params.page_size));
   if (params.pattern_id)    q.set('pattern_id',    String(params.pattern_id));
   if (params.ticker_symbol) q.set('ticker_symbol', params.ticker_symbol);
-  if (params.source)        q.set('source',        params.source);
   return request<HistoryPage>(`/api/history?${q}`);
 };
 

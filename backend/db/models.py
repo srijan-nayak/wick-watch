@@ -69,7 +69,6 @@ class PatternMatch(SQLModel, table=True):
                                        default_factory=lambda: datetime.now(timezone.utc),
                                        index=True,
                                    )
-    source:        str            = Field(default="live", index=True)  # "live" | "backtest"
 
 
 async def create_db():
