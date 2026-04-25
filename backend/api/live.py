@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+from collections import defaultdict
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -20,6 +21,10 @@ from api.ws import broadcast
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/live")
+
+# Max concurrent Kite historical-data requests during seeding.
+# Keeps us well within Kite's rate limits while still parallelising heavily.
+_SEED_CONCURRENCY = 10
 
 
 @router.get("/status")
@@ -49,7 +54,7 @@ async def start_live(session: AsyncSession = Depends(get_session)):
     if not active_tickers:
         raise HTTPException(400, "No active tickers — add at least one ticker first")
 
-    # compile all patterns up front so we fail fast on DSL errors
+    # Compile all patterns up front so we fail fast on DSL errors
     compiled_patterns: list[tuple[Pattern, object]] = []
     for p in active_patterns:
         try:
@@ -60,7 +65,19 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         except (ParseError, ValidationError) as exc:
             raise HTTPException(422, f"Pattern '{p.name}' DSL error: {exc}")
 
-    # determine required lookback per (ticker, interval) and seed buffers
+    # Group patterns by interval and track the max lookback needed per interval.
+    # This lets us fetch seed data once per (ticker, interval) instead of once
+    # per (ticker, pattern) — 414 tickers × 1 interval = 414 calls instead of
+    # 414 × 6 = 2484 calls.
+    interval_patterns: dict[str, list[tuple[Pattern, object]]] = defaultdict(list)
+    interval_lookback: dict[str, int] = {}
+    for pattern, compiled in compiled_patterns:
+        interval_patterns[pattern.interval].append((pattern, compiled))
+        interval_lookback[pattern.interval] = max(
+            interval_lookback.get(pattern.interval, 0),
+            compiled.lookback,
+        )
+
     stream = LiveStream(
         api_key=kite._kite.api_key,
         access_token=kite._kite.access_token,
@@ -80,26 +97,56 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         )
     )
 
-    for ticker in active_tickers:
-        for pattern, compiled in compiled_patterns:
+    # Fetch all seed data concurrently, capped at _SEED_CONCURRENCY at a time.
+    sem = asyncio.Semaphore(_SEED_CONCURRENCY)
+
+    async def _fetch_seed(ticker: Ticker, interval: str, lookback: int):
+        async with sem:
             try:
-                seed_df = kite.historical_data(
+                return await asyncio.to_thread(
+                    kite.historical_data,
                     instrument_token=ticker.instrument_token,
                     from_date=_today() - timedelta(days=5),
                     to_date=_today(),
-                    interval=pattern.interval,
-                    lookback_candles=compiled.lookback,
-                )
-                stream.register(
-                    instrument_token=ticker.instrument_token,
-                    symbol=ticker.symbol,
-                    interval=pattern.interval,
-                    pattern_name=pattern.name,
-                    compiled=compiled,
-                    seed_df=seed_df,
+                    interval=interval,
+                    lookback_candles=lookback,
                 )
             except Exception as exc:
-                log.warning("Could not seed %s/%s: %s", ticker.symbol, pattern.name, exc)
+                log.warning("Could not seed %s/%s: %s", ticker.symbol, interval, exc)
+                return None
+
+    # Build one task per (ticker, interval) pair
+    jobs = [
+        (ticker, interval, _fetch_seed(ticker, interval, interval_lookback[interval]))
+        for ticker in active_tickers
+        for interval in interval_lookback
+    ]
+
+    log.info(
+        "Seeding %d (ticker, interval) pairs for %d tickers × %d intervals "
+        "(concurrency=%d)",
+        len(jobs), len(active_tickers), len(interval_lookback), _SEED_CONCURRENCY,
+    )
+
+    seed_results = await asyncio.gather(*[job[2] for job in jobs])
+
+    # Register all patterns against their seed DataFrames
+    seeded = 0
+    for (ticker, interval, _), seed_df in zip(jobs, seed_results):
+        if seed_df is None:
+            continue
+        for pattern, compiled in interval_patterns[interval]:
+            stream.register(
+                instrument_token=ticker.instrument_token,
+                symbol=ticker.symbol,
+                interval=interval,
+                pattern_name=pattern.name,
+                compiled=compiled,
+                seed_df=seed_df,
+            )
+        seeded += 1
+
+    log.info("Seeded %d/%d (ticker, interval) pairs successfully", seeded, len(jobs))
 
     stream.start()
     set_live_stream(stream)
