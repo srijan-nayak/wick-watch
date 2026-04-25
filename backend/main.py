@@ -17,6 +17,7 @@ from api.ws import router as ws_router
 from api.auth import router as auth_router
 from api.backtest import router as backtest_router
 from api.live import router as live_router
+from api.data import router as data_router
 from db.models import create_db, get_session, UserSession
 from kite.client import KiteClient
 from api.state import set_kite_client
@@ -61,6 +62,7 @@ app.include_router(api_router,      prefix="/api")
 app.include_router(auth_router,     prefix="/api")
 app.include_router(backtest_router, prefix="/api")
 app.include_router(live_router,     prefix="/api")
+app.include_router(data_router,     prefix="/api")
 app.include_router(ws_router)
 
 # ── Web / Docker mode: serve the built React SPA ──────────────────────────────

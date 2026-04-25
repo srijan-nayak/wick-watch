@@ -191,3 +191,21 @@ export const startLive = () =>
 
 export const stopLive = () =>
   request<void>('/api/live/stop', { method: 'POST' });
+
+// ─── Data export / import ─────────────────────────────────────────────────────
+
+export interface ImportResult {
+  patterns_added:   number;
+  patterns_skipped: number;
+  tickers_added:    number;
+  tickers_skipped:  number;
+}
+
+export const exportData = () =>
+  request<unknown>('/api/data/export');
+
+export const importData = (payload: unknown) =>
+  request<ImportResult>('/api/data/import', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
