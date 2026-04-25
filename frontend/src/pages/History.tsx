@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useStore } from '../store';
 import {
   getHistory,
+  getPatterns,
+  getTickers,
   clearHistory,
+  type Pattern,
+  type Ticker,
   type PatternMatchRecord,
   type HistoryPage,
 } from '../api/client';
@@ -24,8 +27,13 @@ function formatIST(iso: string): string {
 }
 
 export default function History() {
-  const patterns = useStore((s) => s.patterns);
-  const tickers  = useStore((s) => s.tickers);
+  const [patterns, setPatterns] = useState<Pattern[]>([]);
+  const [tickers,  setTickers]  = useState<Ticker[]>([]);
+
+  useEffect(() => {
+    getPatterns().then(setPatterns).catch(() => {});
+    getTickers().then(setTickers).catch(() => {});
+  }, []);
 
   const [patternFilter, setPatternFilter] = useState('');
   const [tickerFilter,  setTickerFilter]  = useState('');
