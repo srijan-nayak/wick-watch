@@ -157,10 +157,11 @@ class LiveStream:
 
     def _evaluate(self, token: int, interval: str, df: pd.DataFrame) -> None:
         key = (token, interval)
+        latest_candle_time = df.index[-1]
         for pattern_name, compiled in self._patterns.get(key, []):
             try:
                 matches = run(compiled, df)
-                if matches:
+                if matches and matches[-1] == latest_candle_time:
                     symbol = self._symbols.get(token, str(token))
                     if self._on_alert:
                         self._on_alert(pattern_name, token, symbol, matches[-1])

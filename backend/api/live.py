@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
@@ -65,15 +66,17 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         access_token=kite._kite.access_token,
     )
 
+    loop = asyncio.get_running_loop()
     stream.set_alert_callback(
-        lambda name, token, symbol, ts: asyncio.create_task(
+        lambda name, token, symbol, ts: asyncio.run_coroutine_threadsafe(
             broadcast({
                 "type": "alert",
                 "pattern": name,
                 "instrument_token": token,
                 "symbol": symbol,
                 "candle_time": ts.isoformat(),
-            })
+            }),
+            loop,
         )
     )
 
@@ -82,7 +85,7 @@ async def start_live(session: AsyncSession = Depends(get_session)):
             try:
                 seed_df = kite.historical_data(
                     instrument_token=ticker.instrument_token,
-                    from_date=_today(),
+                    from_date=_today() - timedelta(days=5),
                     to_date=_today(),
                     interval=pattern.interval,
                     lookback_candles=compiled.lookback,
