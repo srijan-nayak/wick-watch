@@ -12,7 +12,7 @@ Intraday trading pattern detection and backtesting for Zerodha Kite. Define mult
 - **Match history** — Every live alert is persisted; browse, filter, and paginate the full history table
 - **Data backup** — Export all patterns, tickers, and match history to JSON; import on a new machine or after a volume wipe
 - **Light / dark mode** — System-respecting theme toggle, applied everywhere including charts
-- **Desktop app** — Packaged as a native desktop app via Tauri (macOS/Linux/Windows); also runs as a web app in Docker
+- **Web app** — Runs fully in the browser; deploy with Docker or run the dev server locally
 
 ---
 
@@ -20,7 +20,6 @@ Intraday trading pattern detection and backtesting for Zerodha Kite. Define mult
 
 | Layer | Technology |
 |---|---|
-| Desktop shell | Tauri (Rust) |
 | Frontend | React 19, TypeScript, Vite |
 | Charts | TradingView Lightweight Charts v5 |
 | Editor | Monaco Editor with custom DSL language |
@@ -36,7 +35,6 @@ Intraday trading pattern detection and backtesting for Zerodha Kite. Define mult
 
 ```
 wick-watch/
-├── src-tauri/          # Tauri shell (Rust) — desktop packaging, sidecar lifecycle
 ├── frontend/           # React app
 │   └── src/
 │       ├── pages/      # Backtest, History, Live, Patterns, Settings, Tickers, Docs
@@ -87,13 +85,6 @@ npm run dev       # Vite dev server at http://localhost:5173
 ```
 
 The frontend proxies API calls to `localhost:8000` in dev mode.
-
-### Desktop (Tauri)
-
-```bash
-cd frontend
-cargo tauri dev   # requires Rust toolchain
-```
 
 ---
 

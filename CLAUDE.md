@@ -7,7 +7,6 @@ Intraday trading pattern detection and backtesting desktop app. Users define mul
 
 ```
 wick-watch/
-├── src-tauri/        # Tauri shell (Rust) — desktop packaging, sidecar lifecycle
 ├── frontend/         # React app — UI, Monaco DSL editor, TradingView charts
 └── backend/          # Python FastAPI — Kite API, pattern execution, data pipeline
     ├── indicators/
@@ -42,7 +41,6 @@ wick-watch/
 ## Tech stack
 | Layer | Choice |
 |---|---|
-| Desktop shell | Tauri (Rust, native webview) |
 | Frontend | React 19 + TradingView Lightweight Charts v5 + Monaco Editor |
 | State | Zustand |
 | Backend | Python 3.11+, FastAPI, WebSocket |
@@ -143,7 +141,6 @@ Frontend store keeps `alerts[]` (newest-first, max 50) and `logs[]` (newest-firs
 - Pivot indicators use `df.index.tz_convert("Asia/Kolkata").normalize()` so day boundaries reset at IST midnight.
 
 ## Development conventions
-- Backend is a FastAPI sidecar — Tauri manages its process lifecycle via `src-tauri/sidecar`
 - All real-time data flows over WebSocket (`/ws`); REST endpoints are for config and backtest requests
 - Never hardcode Kite credentials — always read from the DB/session after OAuth login
 - Backtest and live detection share the same pattern executor — no duplicated matching logic
@@ -159,6 +156,6 @@ Frontend store keeps `alerts[]` (newest-first, max 50) and `logs[]` (newest-firs
 # Terminal 1 — backend (use the venv at backend/.venv)
 cd backend && .venv/bin/uvicorn main:app --reload
 
-# Terminal 2 — frontend + Tauri
-cd frontend && npm run dev        # or inside Tauri: cargo tauri dev
+# Terminal 2 — frontend
+cd frontend && npm run dev        # Vite dev server at http://localhost:5173
 ```

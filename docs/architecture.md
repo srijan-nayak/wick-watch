@@ -3,26 +3,21 @@
 ## System overview
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                     Tauri Shell                     │
-│     (Rust — manages window + sidecar process)       │
-│                                                     │
-│  ┌───────────────────┐  ┌─────────────────────────┐ │
-│  │  React Frontend   │  │    Python Backend        │ │
-│  │                   │◄─┤    (FastAPI sidecar)     │ │
-│  │  Monaco Editor    │  │                          │ │
-│  │  TV LW Charts     │  │  Kite WebSocket          │ │
-│  │  Toast + Audio    │  │  Pattern Executor        │ │
-│  │  Zustand store    │  │  Indicator Registry      │ │
-│  └───────────────────┘  │  SQLite DB               │ │
-│                          └─────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-                           │
-                      Kite API / WebSocket
-                      (Zerodha)
+┌───────────────────┐  ┌─────────────────────────┐
+│  React Frontend   │  │    Python Backend        │
+│                   │◄─┤    (FastAPI)             │
+│  Monaco Editor    │  │                          │
+│  TV LW Charts     │  │  Kite WebSocket          │
+│  Toast + Audio    │  │  Pattern Executor        │
+│  Zustand store    │  │  Indicator Registry      │
+└───────────────────┘  │  SQLite DB               │
+                        └─────────────────────────┘
+                                   │
+                          Kite API / WebSocket
+                          (Zerodha)
 ```
 
-In **web / Docker mode** the React build is served as static files by FastAPI directly — no Tauri shell involved.
+The React build is served as static files by FastAPI — no separate web server needed. In dev mode, Vite runs on port 5173 and proxies API calls to the FastAPI server on port 8000.
 
 ---
 
