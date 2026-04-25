@@ -48,10 +48,14 @@ export default function Settings() {
         parts.push(`${result.patterns_added} pattern${result.patterns_added !== 1 ? 's' : ''} added`);
       if (result.tickers_added > 0)
         parts.push(`${result.tickers_added} ticker${result.tickers_added !== 1 ? 's' : ''} added`);
+      if (result.history_added > 0)
+        parts.push(`${result.history_added} history record${result.history_added !== 1 ? 's' : ''} added`);
       if (result.patterns_skipped > 0)
         parts.push(`${result.patterns_skipped} pattern${result.patterns_skipped !== 1 ? 's' : ''} skipped (already exist)`);
       if (result.tickers_skipped > 0)
         parts.push(`${result.tickers_skipped} ticker${result.tickers_skipped !== 1 ? 's' : ''} skipped (already exist)`);
+      if (result.history_skipped > 0)
+        parts.push(`${result.history_skipped} history record${result.history_skipped !== 1 ? 's' : ''} skipped (already exist)`);
 
       if (parts.length === 0) {
         toast.info('Nothing new to import — everything already exists');
@@ -76,8 +80,8 @@ export default function Settings() {
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Data Backup</h2>
         <p style={styles.cardDesc}>
-          Export all your patterns and tickers to a JSON file. You can re-import it any time
-          to restore your setup — duplicates are automatically skipped.
+          Export all your patterns, tickers, and match history to a JSON file. You can re-import
+          it any time to restore your setup — duplicates are automatically skipped.
         </p>
 
         <div style={styles.actions}>
@@ -85,7 +89,7 @@ export default function Settings() {
           <div style={styles.actionBlock}>
             <div style={styles.actionLabel}>Export</div>
             <p style={styles.actionDesc}>
-              Download a backup of all patterns and tickers.
+              Download a backup of all patterns, tickers, and match history.
             </p>
             <button
               style={{ ...styles.btn, ...styles.btnPrimary, ...(exporting ? styles.btnDisabled : {}) }}
@@ -103,8 +107,8 @@ export default function Settings() {
           <div style={styles.actionBlock}>
             <div style={styles.actionLabel}>Import</div>
             <p style={styles.actionDesc}>
-              Restore from a previously exported backup file. Existing patterns
-              and tickers with the same name or instrument token are left untouched.
+              Restore from a previously exported backup file. Existing patterns, tickers,
+              and history records that already exist are left untouched.
             </p>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary, ...(importing ? styles.btnDisabled : {}) }}

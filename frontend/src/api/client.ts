@@ -199,6 +199,8 @@ export interface ImportResult {
   patterns_skipped: number;
   tickers_added:    number;
   tickers_skipped:  number;
+  history_added:    number;
+  history_skipped:  number;
 }
 
 export const exportData = () =>

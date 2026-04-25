@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from db.models import get_session, Pattern, Ticker
+from db.models import get_session, Pattern, Ticker, PatternMatch
 
 router = APIRouter(prefix="/data")
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/data")
 async def export_data(session: AsyncSession = Depends(get_session)):
     patterns = (await session.exec(select(Pattern))).all()
     tickers  = (await session.exec(select(Ticker))).all()
+    history  = (await session.exec(select(PatternMatch))).all()
 
     return {
         "version":     1,
@@ -38,6 +39,17 @@ async def export_data(session: AsyncSession = Depends(get_session)):
             }
             for t in tickers
         ],
+        "history": [
+            {
+                "pattern_name":  h.pattern_name,
+                "interval":      h.interval,
+                "ticker_symbol": h.ticker_symbol,
+                "exchange":      h.exchange,
+                "candle_time":   h.candle_time.isoformat(),
+                "detected_at":   h.detected_at.isoformat(),
+            }
+            for h in history
+        ],
     }
 
 
@@ -57,10 +69,20 @@ class ImportTicker(BaseModel):
     is_active:        bool = True
 
 
+class ImportHistoryRecord(BaseModel):
+    pattern_name:  str
+    interval:      str
+    ticker_symbol: str
+    exchange:      str
+    candle_time:   datetime
+    detected_at:   datetime
+
+
 class ImportPayload(BaseModel):
     version:  int = 1
-    patterns: list[ImportPattern] = []
-    tickers:  list[ImportTicker]  = []
+    patterns: list[ImportPattern]       = []
+    tickers:  list[ImportTicker]        = []
+    history:  list[ImportHistoryRecord] = []
 
 
 class ImportResult(BaseModel):
@@ -68,6 +90,8 @@ class ImportResult(BaseModel):
     patterns_skipped: int
     tickers_added:    int
     tickers_skipped:  int
+    history_added:    int
+    history_skipped:  int
 
 
 @router.post("/import", response_model=ImportResult)
@@ -78,7 +102,7 @@ async def import_data(
     if payload.version != 1:
         raise HTTPException(400, f"Unsupported backup version: {payload.version}")
 
-    # Existing keys for deduplication
+    # ── Patterns ──────────────────────────────────────────────────────────────
     existing_pattern_names = {
         p.name
         for p in (await session.exec(select(Pattern))).all()
@@ -102,6 +126,7 @@ async def import_data(
         existing_pattern_names.add(p.name)
         patterns_added += 1
 
+    # ── Tickers ───────────────────────────────────────────────────────────────
     tickers_added = tickers_skipped = 0
     for t in payload.tickers:
         if t.instrument_token in existing_tokens:
@@ -116,6 +141,34 @@ async def import_data(
         existing_tokens.add(t.instrument_token)
         tickers_added += 1
 
+    # ── History ───────────────────────────────────────────────────────────────
+    # Deduplicate by (pattern_name, ticker_symbol, candle_time)
+    existing_matches = {
+        (h.pattern_name, h.ticker_symbol, h.candle_time)
+        for h in (await session.exec(select(PatternMatch))).all()
+    }
+
+    history_added = history_skipped = 0
+    for h in payload.history:
+        # Normalise to UTC-aware for consistent comparison
+        ct = h.candle_time
+        if ct.tzinfo is None:
+            ct = ct.replace(tzinfo=timezone.utc)
+        key = (h.pattern_name, h.ticker_symbol, ct)
+        if key in existing_matches:
+            history_skipped += 1
+            continue
+        session.add(PatternMatch(
+            pattern_name=h.pattern_name,
+            interval=h.interval,
+            ticker_symbol=h.ticker_symbol,
+            exchange=h.exchange,
+            candle_time=ct,
+            detected_at=h.detected_at if h.detected_at.tzinfo else h.detected_at.replace(tzinfo=timezone.utc),
+        ))
+        existing_matches.add(key)
+        history_added += 1
+
     await session.commit()
 
     return ImportResult(
@@ -123,4 +176,6 @@ async def import_data(
         patterns_skipped=patterns_skipped,
         tickers_added=tickers_added,
         tickers_skipped=tickers_skipped,
+        history_added=history_added,
+        history_skipped=history_skipped,
     )
