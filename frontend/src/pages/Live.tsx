@@ -22,6 +22,13 @@ function timeAgo(iso: string): string {
   return `${hrs}h ago`;
 }
 
+function parseUTC(iso: string): Date {
+  if (!iso.endsWith('Z') && !iso.includes('+') && !/\d{2}:\d{2}$/.test(iso.slice(-6))) {
+    return new Date(iso + 'Z');
+  }
+  return new Date(iso);
+}
+
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
@@ -29,7 +36,7 @@ function fmtTime(iso: string): string {
 }
 
 function fmtCandleTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  return parseUTC(iso).toLocaleString(undefined, {
     month: 'short', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   });

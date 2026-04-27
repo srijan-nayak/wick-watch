@@ -13,8 +13,17 @@ import SearchableSelect from '../components/SearchableSelect';
 
 const PAGE_SIZE = 50;
 
+function parseUTC(iso: string): Date {
+  // SQLite strips timezone info, so bare strings like "2024-01-15T04:35:00"
+  // must be treated as UTC, not local time.
+  if (!iso.endsWith('Z') && !iso.includes('+') && !/\d{2}:\d{2}$/.test(iso.slice(-6))) {
+    return new Date(iso + 'Z');
+  }
+  return new Date(iso);
+}
+
 function formatLocalTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  return parseUTC(iso).toLocaleString(undefined, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
