@@ -37,6 +37,7 @@ function fmtTime(iso: string): string {
 
 function fmtCandleTime(iso: string): string {
   return parseUTC(iso).toLocaleString(undefined, {
+    timeZone: 'Asia/Kolkata',
     month: 'short', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   });

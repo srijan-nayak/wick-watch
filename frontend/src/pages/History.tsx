@@ -22,8 +22,9 @@ function parseUTC(iso: string): Date {
   return new Date(iso);
 }
 
-function formatLocalTime(iso: string): string {
+function formatCandleTime(iso: string): string {
   return parseUTC(iso).toLocaleString(undefined, {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -164,7 +165,7 @@ export default function History() {
           <table style={s.table}>
             <thead>
               <tr>
-                <th style={s.th}>Candle Time</th>
+                <th style={s.th}>Candle Time (IST)</th>
                 <th style={s.th}>Pattern</th>
                 <th style={s.th}>Ticker</th>
                 <th style={s.th}>Interval</th>
@@ -176,7 +177,7 @@ export default function History() {
                   key={r.id}
                   style={idx % 2 === 0 ? s.rowEven : s.rowOdd}
                 >
-                  <td style={s.td}>{formatLocalTime(r.candle_time)}</td>
+                  <td style={s.td}>{formatCandleTime(r.candle_time)}</td>
                   <td style={s.td}>
                     <span style={s.patternName}>{r.pattern_name}</span>
                   </td>
