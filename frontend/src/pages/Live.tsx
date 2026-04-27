@@ -23,10 +23,8 @@ function timeAgo(iso: string): string {
 }
 
 function parseUTC(iso: string): Date {
-  if (!iso.endsWith('Z') && !iso.includes('+') && !/\d{2}:\d{2}$/.test(iso.slice(-6))) {
-    return new Date(iso + 'Z');
-  }
-  return new Date(iso);
+  const hasTimezone = iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso);
+  return new Date(hasTimezone ? iso : iso + 'Z');
 }
 
 function fmtTime(iso: string): string {

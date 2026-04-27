@@ -16,10 +16,8 @@ const PAGE_SIZE = 50;
 function parseUTC(iso: string): Date {
   // SQLite strips timezone info, so bare strings like "2024-01-15T04:35:00"
   // must be treated as UTC, not local time.
-  if (!iso.endsWith('Z') && !iso.includes('+') && !/\d{2}:\d{2}$/.test(iso.slice(-6))) {
-    return new Date(iso + 'Z');
-  }
-  return new Date(iso);
+  const hasTimezone = iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso);
+  return new Date(hasTimezone ? iso : iso + 'Z');
 }
 
 function formatCandleTime(iso: string): string {
