@@ -8,6 +8,7 @@ from kite.stream import LiveStream
 
 _kite_client: KiteClient | None = None
 _live_stream: LiveStream | None = None
+_active_tickers: list | None = None
 
 
 def get_kite_client() -> KiteClient:
@@ -42,3 +43,17 @@ def clear_live_stream() -> None:
 
 def is_live_running() -> bool:
     return _live_stream is not None
+
+
+def get_active_tickers() -> list | None:
+    return _active_tickers
+
+
+def set_active_tickers(tickers: list) -> None:
+    global _active_tickers
+    _active_tickers = tickers
+
+
+def clear_active_tickers() -> None:
+    global _active_tickers
+    _active_tickers = None

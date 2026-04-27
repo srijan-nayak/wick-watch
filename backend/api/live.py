@@ -16,6 +16,7 @@ from kite.stream import LiveStream
 from api.state import (
     get_kite_client, get_live_stream, set_live_stream,
     clear_live_stream, is_live_running,
+    set_active_tickers, clear_active_tickers,
 )
 from api.ws import broadcast
 
@@ -148,9 +149,6 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         access_token=kite._kite.access_token,
     )
 
-    pattern_map = {p.name: p for p, _ in compiled_patterns}
-    ticker_map  = {t.instrument_token: t for t in active_tickers}
-
     async def _handle_alert(name: str, token: int, symbol: str, ts) -> None:
         await broadcast({
             "type": "alert",
@@ -159,10 +157,10 @@ async def start_live(session: AsyncSession = Depends(get_session)):
             "symbol": symbol,
             "candle_time": ts.isoformat(),
         })
-        pat    = pattern_map.get(name)
-        ticker = ticker_map.get(token)
         candle_dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
         async with _AsyncSession(engine) as db:
+            pat    = (await db.exec(select(Pattern).where(Pattern.name == name))).first()
+            ticker = (await db.exec(select(Ticker).where(Ticker.instrument_token == token))).first()
             db.add(PatternMatch(
                 pattern_id=pat.id if pat else None,
                 pattern_name=name,
@@ -250,6 +248,7 @@ async def start_live(session: AsyncSession = Depends(get_session)):
 
     stream.start()
     set_live_stream(stream)
+    set_active_tickers(list(active_tickers))
     await _log("info", f"Stream started — watching {seeded} buffer(s) for pattern matches")
 
     return {"ok": True, "patterns": len(compiled_patterns), "tickers": len(active_tickers)}
@@ -261,6 +260,7 @@ async def stop_live():
     if stream:
         stream.stop()
         clear_live_stream()
+        clear_active_tickers()
         await _log("info", "Live detection stopped")
     return {"ok": True}
 

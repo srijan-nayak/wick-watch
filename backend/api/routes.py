@@ -1,14 +1,21 @@
+import asyncio
+import logging
 import re
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from db.models import get_session, Pattern, Ticker
 from indicators.registry import indicator_metadata
+from api import state as _state
 from api.state import get_kite_client
 from sqlmodel import select
+from dsl.compiler import compile_pattern
 from dsl.parser import parse, ParseError
 from dsl.validator import validate, ValidationError
 from dsl.lexer import LexError
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -99,11 +106,59 @@ async def create_pattern(pattern: Pattern, session: AsyncSession = Depends(get_s
 @router.patch("/patterns/{pattern_id}")
 async def update_pattern(pattern_id: int, data: dict, session: AsyncSession = Depends(get_session)):
     pattern = await session.get(Pattern, pattern_id)
+    old_active = pattern.is_active
+
     for k, v in data.items():
         setattr(pattern, k, v)
     session.add(pattern)
     await session.commit()
     await session.refresh(pattern)
+
+    stream = _state.get_live_stream()
+    if stream and "is_active" in data:
+        new_active = bool(data["is_active"])
+        if old_active and not new_active:
+            stream.remove_pattern(pattern.name)
+        elif not old_active and new_active:
+            try:
+                ast = parse(pattern.dsl)
+                validate(ast)
+                compiled = compile_pattern(ast)
+            except (ParseError, ValidationError) as exc:
+                log.warning("Could not activate pattern '%s' in stream: %s", pattern.name, exc)
+                return pattern
+            for ticker in (_state.get_active_tickers() or []):
+                if stream.has_buffer(ticker.instrument_token, pattern.interval):
+                    stream.add_pattern(
+                        instrument_token=ticker.instrument_token,
+                        symbol=ticker.symbol,
+                        interval=pattern.interval,
+                        pattern_name=pattern.name,
+                        compiled=compiled,
+                    )
+                else:
+                    try:
+                        kite = _state.get_kite_client()
+                        seed_df = await asyncio.to_thread(
+                            kite.historical_data,
+                            instrument_token=ticker.instrument_token,
+                            from_date=date.today() - timedelta(days=5),
+                            to_date=date.today(),
+                            interval=pattern.interval,
+                            lookback_candles=compiled.lookback,
+                        )
+                        stream.add_pattern(
+                            instrument_token=ticker.instrument_token,
+                            symbol=ticker.symbol,
+                            interval=pattern.interval,
+                            pattern_name=pattern.name,
+                            compiled=compiled,
+                            seed_df=seed_df,
+                        )
+                    except Exception as exc:
+                        log.warning("Could not seed %s/%s for pattern '%s': %s",
+                                    ticker.symbol, pattern.interval, pattern.name, exc)
+
     return pattern
 
 

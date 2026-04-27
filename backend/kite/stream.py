@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Callable
@@ -90,6 +91,7 @@ class LiveStream:
         self._symbols: dict[int, str] = {}
 
         self._on_alert: AlertCallback | None = None
+        self._lock = threading.Lock()
 
     def set_alert_callback(self, cb: AlertCallback) -> None:
         self._on_alert = cb
@@ -109,20 +111,57 @@ class LiveStream:
         """
         key = (instrument_token, interval)
         capacity = compiled.window_size + compiled.lookback
-
         self._symbols[instrument_token] = symbol
 
-        if key not in self._buffers:
-            buf = CandleBuffer(interval=interval, capacity=capacity)
-            buf.seed(seed_df)
-            self._buffers[key] = buf
-        else:
-            # expand capacity if a new pattern needs more history
-            existing = self._buffers[key]
-            if capacity > existing.capacity:
-                existing.capacity = capacity
+        with self._lock:
+            if key not in self._buffers:
+                buf = CandleBuffer(interval=interval, capacity=capacity)
+                buf.seed(seed_df)
+                self._buffers[key] = buf
+            else:
+                existing = self._buffers[key]
+                if capacity > existing.capacity:
+                    existing.capacity = capacity
+            self._patterns[key].append((pattern_name, compiled))
 
-        self._patterns[key].append((pattern_name, compiled))
+    def has_buffer(self, instrument_token: int, interval: str) -> bool:
+        return (instrument_token, interval) in self._buffers
+
+    def add_pattern(
+        self,
+        instrument_token: int,
+        symbol: str,
+        interval: str,
+        pattern_name: str,
+        compiled: CompiledPattern,
+        seed_df: pd.DataFrame | None = None,
+    ) -> bool:
+        """Add a pattern to a running stream. Returns False if buffer is missing and no seed_df provided."""
+        key = (instrument_token, interval)
+        capacity = compiled.window_size + compiled.lookback
+        self._symbols[instrument_token] = symbol
+        with self._lock:
+            if key not in self._buffers:
+                if seed_df is None:
+                    return False
+                buf = CandleBuffer(interval=interval, capacity=capacity)
+                buf.seed(seed_df)
+                self._buffers[key] = buf
+            else:
+                existing = self._buffers[key]
+                if capacity > existing.capacity:
+                    existing.capacity = capacity
+            self._patterns[key].append((pattern_name, compiled))
+        return True
+
+    def remove_pattern(self, pattern_name: str) -> None:
+        """Remove all registrations of a named pattern from the stream."""
+        with self._lock:
+            for key in list(self._patterns.keys()):
+                self._patterns[key] = [
+                    (name, compiled) for name, compiled in self._patterns[key]
+                    if name != pattern_name
+                ]
 
     def start(self) -> None:
         tokens = list({token for token, _ in self._buffers})
@@ -158,7 +197,9 @@ class LiveStream:
     def _evaluate(self, token: int, interval: str, df: pd.DataFrame) -> None:
         key = (token, interval)
         latest_candle_time = df.index[-1]
-        for pattern_name, compiled in self._patterns.get(key, []):
+        with self._lock:
+            patterns = list(self._patterns.get(key, []))
+        for pattern_name, compiled in patterns:
             try:
                 matches = run(compiled, df)
                 if matches and matches[-1] == latest_candle_time:
