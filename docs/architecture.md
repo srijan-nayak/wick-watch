@@ -40,14 +40,15 @@ The React build is served as static files by FastAPI — no separate web server 
 
 ### Live detection
 1. User clicks "Start" → `POST /api/live/start`
-2. Backend compiles all active patterns (fails fast on DSL errors)
-3. Groups patterns by interval; seeds each `(ticker, interval)` buffer with recent historical candles via Kite REST API — one fetch per pair, rate-limited to 2.5 req/s with exponential-backoff retry
+2. Backend compiles all active patterns (fails fast on DSL errors), then **returns immediately**
+3. Seeding runs in a background `asyncio.Task` — groups patterns by interval, seeds each `(ticker, interval)` buffer with recent historical candles via Kite REST API, rate-limited to 2.5 req/s with exponential-backoff retry
 4. Seeding progress broadcast as `{"type":"log",...}` WebSocket messages to the Live → Logs tab
 5. After seeding, `LiveStream` subscribes to Kite WebSocket for all configured tickers
 6. Incoming ticks are aggregated into candles per interval by `executor/aggregator.py`
 7. On each new candle close, all matching patterns for that interval are evaluated
 8. On match: broadcast `{"type":"alert",...}` over `/ws` AND write a `PatternMatch` row to SQLite
 9. Frontend receives alert → shows toast + plays audio cue
+10. User can click "Stop" at any time — cancels the seeding task if still running, or stops the stream if already started
 
 ---
 
@@ -62,15 +63,15 @@ The React build is served as static files by FastAPI — no separate web server 
 | `executor/engine.py` | Evaluate compiled pattern against a candle DataFrame window |
 | `executor/aggregator.py` | Aggregate raw ticks → OHLCV candles by interval; normalises timestamps to UTC |
 | `kite/client.py` | Kite REST API wrapper (historical data, instrument search) |
-| `kite/stream.py` | Kite WebSocket tick stream; deduplicates alerts against last-seen candle time |
+| `kite/stream.py` | Kite WebSocket tick stream; deduplicates alerts against last-seen candle time; thread-safe `add_pattern()` / `remove_pattern()` for dynamic toggling while running |
 | `db/models.py` | SQLModel tables: Pattern, Ticker, UserSession, Alert, PatternMatch |
-| `api/routes.py` | REST endpoints: patterns, tickers, indicators |
+| `api/routes.py` | REST endpoints: patterns, tickers, indicators; PATCH `/patterns/{id}` syncs `is_active` changes into the running stream without restart |
 | `api/auth.py` | Kite OAuth login-url + callback + logout |
 | `api/backtest.py` | Single POST endpoint; fetches candles, runs executor, returns results |
-| `api/live.py` | Start/stop/status; seeding logic, rate limiter, alert handler |
+| `api/live.py` | Start/stop/status; seeding runs in a background task (cancellable); rate limiter; alert handler queries DB for pattern/ticker info |
 | `api/history.py` | Paginated `GET /history` (filters: pattern_id, ticker_symbol) + `DELETE /history` |
 | `api/data.py` | `GET /data/export` + `POST /data/import` for full data backup/restore |
-| `api/state.py` | Module-level singletons: KiteClient ref, LiveStream ref, running flag |
+| `api/state.py` | Module-level singletons: KiteClient ref, LiveStream ref, seeding Task ref, active tickers list; `is_live_running()` returns true during seeding or streaming |
 | `api/ws.py` | `/ws` WebSocket endpoint + `broadcast()` helper |
 
 ---

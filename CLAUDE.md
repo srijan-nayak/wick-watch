@@ -21,7 +21,7 @@ wick-watch/
     │   ├── live.py       # Live detection start/stop/status
     │   ├── history.py    # Paginated match history
     │   ├── data.py       # Export / import backup
-    │   ├── state.py      # Shared app state (kite client, live stream)
+    │   ├── state.py      # Shared app state (kite client, live stream, seeding task, active tickers)
     │   └── ws.py         # WebSocket broadcast
     └── db/               # SQLite models (SQLModel)
         └── models.py     # Pattern, Ticker, UserSession, Alert, PatternMatch
@@ -109,11 +109,20 @@ All real-time events flow over `/ws`. Backend → frontend message shapes:
 Frontend store keeps `alerts[]` (newest-first, max 50) and `logs[]` (newest-first, max 500).
 
 ## Live detection internals
+- `POST /api/live/start` validates + compiles patterns, then returns immediately. Seeding + `stream.start()` run in a background `asyncio.Task` stored in `state._seeding_task`. `is_live_running()` returns True during seeding too (checks both `_seeding_task` and `_live_stream`).
+- `POST /api/live/stop` cancels the seeding task if still running (via `task.cancel()` + await), then stops the stream — works at any phase.
 - Patterns are grouped by interval; one historical seed fetch per `(ticker, interval)` — not per `(ticker, pattern)`. Lookback is the max across all patterns sharing that interval.
 - Kite historical API is rate-limited to ~3 req/s. A `_RateLimiter` token-bucket at 2.5 req/s with exponential-backoff retries (`_MAX_RETRIES = 3`, backoff = 2^attempt seconds) guards all seed fetches.
 - `stream.set_alert_callback` runs in a KiteTicker background thread; the callback uses `asyncio.run_coroutine_threadsafe(coro, loop)` — `loop` is captured with `asyncio.get_running_loop()` inside the async endpoint before the stream starts.
-- On alert: broadcasts `{"type":"alert",...}` over WebSocket AND writes a `PatternMatch` row to the DB via a fresh `AsyncSession(engine)`.
+- On alert: `_handle_alert` queries the DB for pattern/ticker info (not from a closure map), broadcasts `{"type":"alert",...}` over WebSocket, and writes a `PatternMatch` row via a fresh `AsyncSession(engine)`.
 - Seeding progress is broadcast as `{"type":"log",...}` messages so the Live → Logs tab shows real-time progress.
+
+## Dynamic pattern toggling during live detection
+Patterns can be enabled or disabled while live detection is running without a stream restart:
+- **Disable** (`is_active: false`): `stream.remove_pattern(name)` atomically replaces each `_patterns[key]` list with a filtered copy under a `threading.Lock`. Takes effect on the next candle close.
+- **Enable** (`is_active: true`): DSL is compiled, then for each active ticker: if `(token, interval)` buffer already exists → `stream.add_pattern()` under the lock (instant, no API call); if the interval is new → seed via Kite historical API first, then register.
+- `state._active_tickers` stores the ticker list captured at stream start so the PATCH endpoint knows which tickers to register the newly-enabled pattern for.
+- `LiveStream` uses a `threading.Lock` around all reads/writes to `_patterns` and `_buffers` to avoid races between the KiteTicker background thread and the async PATCH handler. `_evaluate()` takes a list snapshot under the lock before iterating.
 
 ## Database models
 | Model | Key fields |

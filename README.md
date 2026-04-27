@@ -8,7 +8,7 @@ Intraday trading pattern detection and backtesting for Zerodha Kite. Define mult
 
 - **Custom DSL** — Write readable multi-candle conditions with full indicator support and IDE-quality autocomplete
 - **Backtest** — Run any pattern against any ticker over a date range; results overlay on an interactive candlestick chart
-- **Live detection** — Stream live ticks from Kite WebSocket, match patterns on candle close, get instant alerts with audio cue
+- **Live detection** — Stream live ticks from Kite WebSocket, match patterns on candle close, get instant alerts with audio cue; enable or disable individual patterns while the stream is running without a restart
 - **Match history** — Every live alert is persisted; browse, filter, and paginate the full history table
 - **Data backup** — Export all patterns, tickers, and match history to JSON; import on a new machine or after a volume wipe
 - **Light / dark mode** — System-respecting theme toggle, applied everywhere including charts
