@@ -13,9 +13,8 @@ import SearchableSelect from '../components/SearchableSelect';
 
 const PAGE_SIZE = 50;
 
-function formatIST(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
+function formatLocalTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -156,7 +155,7 @@ export default function History() {
           <table style={s.table}>
             <thead>
               <tr>
-                <th style={s.th}>Candle Time (IST)</th>
+                <th style={s.th}>Candle Time</th>
                 <th style={s.th}>Pattern</th>
                 <th style={s.th}>Ticker</th>
                 <th style={s.th}>Interval</th>
@@ -168,7 +167,7 @@ export default function History() {
                   key={r.id}
                   style={idx % 2 === 0 ? s.rowEven : s.rowOdd}
                 >
-                  <td style={s.td}>{formatIST(r.candle_time)}</td>
+                  <td style={s.td}>{formatLocalTime(r.candle_time)}</td>
                   <td style={s.td}>
                     <span style={s.patternName}>{r.pattern_name}</span>
                   </td>

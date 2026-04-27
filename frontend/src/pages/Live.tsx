@@ -23,7 +23,14 @@ function timeAgo(iso: string): string {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-IN', {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+}
+
+function fmtCandleTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   });
 }
@@ -54,7 +61,7 @@ function AlertRow({ alert }: { alert: Alert }) {
         <div style={styles.alertMeta}>
           <span style={styles.alertSymbol}>{alert.symbol}</span>
           <span style={styles.alertSep}>·</span>
-          <span style={styles.alertCandleTime}>{alert.candle_time}</span>
+          <span style={styles.alertCandleTime}>{fmtCandleTime(alert.candle_time)}</span>
         </div>
       </div>
     </div>
