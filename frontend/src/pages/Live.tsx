@@ -159,7 +159,7 @@ export default function Live() {
     try {
       await startLive();
       setLiveRunning(true);
-      toast.success('Live detection started');
+      toast.success('Seeding buffers — live detection will start shortly');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start live detection');
     }

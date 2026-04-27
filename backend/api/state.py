@@ -9,6 +9,7 @@ from kite.stream import LiveStream
 _kite_client: KiteClient | None = None
 _live_stream: LiveStream | None = None
 _active_tickers: list | None = None
+_seeding_task: object | None = None  # asyncio.Task during seeding phase
 
 
 def get_kite_client() -> KiteClient:
@@ -42,7 +43,21 @@ def clear_live_stream() -> None:
 
 
 def is_live_running() -> bool:
-    return _live_stream is not None
+    return _live_stream is not None or _seeding_task is not None
+
+
+def get_seeding_task():
+    return _seeding_task
+
+
+def set_seeding_task(task) -> None:
+    global _seeding_task
+    _seeding_task = task
+
+
+def clear_seeding_task() -> None:
+    global _seeding_task
+    _seeding_task = None
 
 
 def get_active_tickers() -> list | None:

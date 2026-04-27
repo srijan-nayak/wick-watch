@@ -17,6 +17,7 @@ from api.state import (
     get_kite_client, get_live_stream, set_live_stream,
     clear_live_stream, is_live_running,
     set_active_tickers, clear_active_tickers,
+    get_seeding_task, set_seeding_task, clear_seeding_task,
 )
 from api.ws import broadcast
 
@@ -178,8 +179,8 @@ async def start_live(session: AsyncSession = Depends(get_session)):
         )
     )
 
-    limiter      = _RateLimiter(_KITE_RATE)
-    progress     = [0]
+    limiter       = _RateLimiter(_KITE_RATE)
+    progress      = [0]
     progress_step = max(1, total_jobs // 10)
 
     async def _fetch_seed(ticker: Ticker, interval: str, lookback: int):
@@ -199,13 +200,15 @@ async def start_live(session: AsyncSession = Depends(get_session)):
                     await _log("info", f"Seeding… {progress[0]}/{total_jobs} done")
                 return result
 
+            except asyncio.CancelledError:
+                raise
+
             except Exception as exc:
                 if _is_rate_limited(exc) and attempt < _MAX_RETRIES:
-                    backoff = 2 ** attempt   # 1 s, 2 s, 4 s
+                    backoff = 2 ** attempt
                     await asyncio.sleep(backoff)
-                    continue  # retry — don't count as progress yet
+                    continue
 
-                # Final failure after retries (or a non-rate-limit error)
                 progress[0] += 1
                 if progress[0] % progress_step == 0 or progress[0] == total_jobs:
                     await _log("info", f"Seeding… {progress[0]}/{total_jobs} done")
@@ -219,49 +222,72 @@ async def start_live(session: AsyncSession = Depends(get_session)):
                         f"Could not seed {ticker.symbol} ({interval}): {exc}")
                 return None
 
-    jobs = [
-        (ticker, interval, _fetch_seed(ticker, interval, interval_lookback[interval]))
-        for ticker in active_tickers
-        for interval in interval_lookback
-    ]
+    async def _seed_and_start():
+        try:
+            jobs = [
+                (ticker, interval, _fetch_seed(ticker, interval, interval_lookback[interval]))
+                for ticker in active_tickers
+                for interval in interval_lookback
+            ]
 
-    seed_results = await asyncio.gather(*[job[2] for job in jobs])
+            seed_results = await asyncio.gather(*[job[2] for job in jobs])
 
-    seeded = failed = 0
-    for (ticker, interval, _), seed_df in zip(jobs, seed_results):
-        if seed_df is None:
-            failed += 1
-            continue
-        for pattern, compiled in interval_patterns[interval]:
-            stream.register(
-                instrument_token=ticker.instrument_token,
-                symbol=ticker.symbol,
-                interval=interval,
-                pattern_name=pattern.name,
-                compiled=compiled,
-                seed_df=seed_df,
-            )
-        seeded += 1
+            seeded = failed = 0
+            for (ticker, interval, _), seed_df in zip(jobs, seed_results):
+                if seed_df is None:
+                    failed += 1
+                    continue
+                for pattern, compiled in interval_patterns[interval]:
+                    stream.register(
+                        instrument_token=ticker.instrument_token,
+                        symbol=ticker.symbol,
+                        interval=interval,
+                        pattern_name=pattern.name,
+                        compiled=compiled,
+                        seed_df=seed_df,
+                    )
+                seeded += 1
 
-    summary = f"Seeding complete — {seeded} seeded, {failed} failed"
-    await _log("warn" if failed else "info", summary)
+            summary = f"Seeding complete — {seeded} seeded, {failed} failed"
+            await _log("warn" if failed else "info", summary)
 
-    stream.start()
-    set_live_stream(stream)
+            stream.start()
+            set_live_stream(stream)
+            await _log("info", f"Stream started — watching {seeded} buffer(s) for pattern matches")
+
+        except asyncio.CancelledError:
+            await _log("warn", "Live detection cancelled during seeding")
+
+        finally:
+            clear_seeding_task()
+
     set_active_tickers(list(active_tickers))
-    await _log("info", f"Stream started — watching {seeded} buffer(s) for pattern matches")
+    task = asyncio.create_task(_seed_and_start())
+    set_seeding_task(task)
 
     return {"ok": True, "patterns": len(compiled_patterns), "tickers": len(active_tickers)}
 
 
 @router.post("/stop")
 async def stop_live():
+    task = get_seeding_task()
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
     stream = get_live_stream()
     if stream:
         stream.stop()
         clear_live_stream()
-        clear_active_tickers()
+
+    clear_active_tickers()
+
+    if task or stream:
         await _log("info", "Live detection stopped")
+
     return {"ok": True}
 
 
