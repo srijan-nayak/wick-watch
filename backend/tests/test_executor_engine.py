@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from dsl.parser import parse
 from dsl.compiler import compile_pattern
-from executor.engine import run, EvalError, _all_same_ist_day, _c1_before_cutoff
+from executor.engine import run, EvalError, _all_same_ist_day, _c1_before_cutoff, _ACTIVE_UNTIL_RE
 
 
 # ------------------------------------------------------------------ helpers
@@ -305,7 +305,6 @@ _IST_11_30 = "2024-01-02 06:00:00"
 _IST_12_00 = "2024-01-02 06:30:00"
 
 _GREEN = (10, 15, 9, 14, 100)  # open < close → green
-_RED   = (14, 15, 9, 10, 100)  # open > close → red
 
 
 class TestActiveUntil:
@@ -361,3 +360,20 @@ class TestActiveUntil:
         df = make_df_at([_IST_12_00], [_GREEN])
         compiled = self._compiled("c1.is_green")
         assert run(compiled, df, intraday_only=True, active_until="11:30") == []
+
+    def test_malformed_active_until_raises_eval_error(self):
+        df = make_df_at([_IST_10_00], [_GREEN])
+        with pytest.raises(EvalError, match="not a valid HH:MM"):
+            _c1_before_cutoff(df, "9:15am")
+        with pytest.raises(EvalError, match="not a valid HH:MM"):
+            _c1_before_cutoff(df, "25:00")
+        with pytest.raises(EvalError, match="not a valid HH:MM"):
+            _c1_before_cutoff(df, "")
+
+    @pytest.mark.parametrize("t", ["00:00", "09:15", "15:30", "23:59"])
+    def test_active_until_regex_valid(self, t):
+        assert _ACTIVE_UNTIL_RE.match(t)
+
+    @pytest.mark.parametrize("t", ["9:15", "24:00", "12:60", "9:15am", ""])
+    def test_active_until_regex_invalid(self, t):
+        assert not _ACTIVE_UNTIL_RE.match(t)

@@ -1,7 +1,10 @@
 from __future__ import annotations
 import math
+import re
 import pytz
 import pandas as pd
+
+_ACTIVE_UNTIL_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 from dsl.ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
     CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
@@ -24,6 +27,8 @@ def _all_same_ist_day(df: pd.DataFrame, window_size: int) -> bool:
 
 def _c1_before_cutoff(df: pd.DataFrame, active_until: str) -> bool:
     """Return True if c1's IST wall-clock time is strictly before the active_until cutoff."""
+    if not _ACTIVE_UNTIL_RE.match(active_until):
+        raise EvalError(f"active_until '{active_until}' is not a valid HH:MM time (00:00–23:59)")
     c1_ist = df.index[-1].tz_convert(_IST)
     h, m = map(int, active_until.split(":"))
     cutoff = c1_ist.replace(hour=h, minute=m, second=0, microsecond=0)

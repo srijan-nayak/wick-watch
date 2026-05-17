@@ -145,10 +145,12 @@ export default function Patterns() {
             >
               <div style={styles.patternMeta}>
                 <span style={styles.patternName}>{p.name}</span>
-                <span style={styles.intervalBadge}>{p.interval}</span>
-                {p.active_until && (
-                  <span style={styles.cutoffBadge}>until {p.active_until}</span>
-                )}
+                <div style={styles.badgeGroup}>
+                  <span style={styles.intervalBadge}>{p.interval}</span>
+                  {p.active_until && (
+                    <span style={styles.cutoffBadge}>until {p.active_until}</span>
+                  )}
+                </div>
               </div>
               <div style={styles.patternActions}>
                 <button
@@ -341,6 +343,12 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     flex: 1,
+  },
+  badgeGroup: {
+    display: 'flex',
+    gap: 4,
+    alignItems: 'center',
+    flexShrink: 0,
   },
   intervalBadge: {
     fontSize: 10,
