@@ -4,14 +4,20 @@ import pandas as pd
 import numpy as np
 from dsl.parser import parse
 from dsl.compiler import compile_pattern
-from executor.engine import run, EvalError
+from executor.engine import run, EvalError, _all_same_ist_day
 
 
 # ------------------------------------------------------------------ helpers
 
 def make_df(rows: list[tuple]) -> pd.DataFrame:
-    """rows: list of (open, high, low, close, volume), oldest first."""
-    idx = pd.date_range("2024-01-01 09:15", periods=len(rows), freq="5min")
+    """rows: list of (open, high, low, close, volume), oldest first. Index is UTC-aware."""
+    idx = pd.date_range("2024-01-01 09:15", periods=len(rows), freq="5min", tz="UTC")
+    return pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
+
+
+def make_df_at(timestamps: list[str], rows: list[tuple]) -> pd.DataFrame:
+    """Build a UTC-aware DataFrame with explicit ISO timestamp strings."""
+    idx = pd.DatetimeIndex([pd.Timestamp(t, tz="UTC") for t in timestamps])
     return pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
 
 
@@ -209,3 +215,80 @@ c1.close > c2.open
         ]
         idxs = match_indices(dsl, rows)
         assert idxs == []
+
+
+# ------------------------------------------------------------------ intraday_only
+
+# IST is UTC+5:30.  IST midnight = UTC 18:30 of the previous calendar day.
+# Candles are placed at:
+#   Day 1 last candle : IST 15:25 = UTC 2024-01-01 09:55
+#   Day 2 first candle: IST 09:15 = UTC 2024-01-02 03:45
+_DAY1_LAST  = "2024-01-01 09:55:00"  # IST 15:25 Jan 1
+_DAY2_FIRST = "2024-01-02 03:45:00"  # IST 09:15 Jan 2
+_DAY2_NEXT  = "2024-01-02 03:50:00"  # IST 09:20 Jan 2
+
+
+class TestIntradayOnly:
+    """Verify that intraday_only=True blocks windows spanning IST day boundaries."""
+
+    def _compiled(self, dsl: str):
+        return compile_pattern(parse(dsl))
+
+    def test_cross_day_window_blocked_with_intraday_only(self):
+        # c2 on Day 1, c1 on Day 2 → intraday_only=True must suppress the match
+        rows = [
+            (12, 15, 9, 10, 100),   # c2: red  (Day 1 last candle)
+            (10, 15, 9, 14, 100),   # c1: green (Day 2 first candle)
+        ]
+        df = make_df_at([_DAY1_LAST, _DAY2_FIRST], rows)
+        compiled = self._compiled("c1.is_green AND c2.is_red")
+        assert run(compiled, df, intraday_only=True) == []
+
+    def test_cross_day_window_fires_without_intraday_only(self):
+        # Same data — intraday_only=False should still match
+        rows = [
+            (12, 15, 9, 10, 100),
+            (10, 15, 9, 14, 100),
+        ]
+        df = make_df_at([_DAY1_LAST, _DAY2_FIRST], rows)
+        compiled = self._compiled("c1.is_green AND c2.is_red")
+        matches = run(compiled, df, intraday_only=False)
+        assert len(matches) == 1
+
+    def test_same_day_window_still_fires_with_intraday_only(self):
+        # Both candles on Day 2 → should match normally
+        rows = [
+            (12, 15, 9, 10, 100),   # c2: red  (Day 2 09:15)
+            (10, 15, 9, 14, 100),   # c1: green (Day 2 09:20)
+        ]
+        df = make_df_at([_DAY2_FIRST, _DAY2_NEXT], rows)
+        compiled = self._compiled("c1.is_green AND c2.is_red")
+        matches = run(compiled, df, intraday_only=True)
+        assert len(matches) == 1
+
+    def test_single_candle_pattern_always_passes_intraday_check(self):
+        # window_size=1 — the day check is trivially true
+        rows = [(10, 15, 9, 14, 100)]
+        df = make_df_at([_DAY2_FIRST], rows)
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=True) == [df.index[0]]
+
+    def test_all_same_ist_day_helper_same_day(self):
+        df = make_df_at([_DAY2_FIRST, _DAY2_NEXT], [(0,)*5, (0,)*5])
+        assert _all_same_ist_day(df, window_size=2) is True
+
+    def test_all_same_ist_day_helper_cross_day(self):
+        df = make_df_at([_DAY1_LAST, _DAY2_FIRST], [(0,)*5, (0,)*5])
+        assert _all_same_ist_day(df, window_size=2) is False
+
+    def test_lookback_candles_from_prior_day_do_not_block_match(self):
+        # window_size=1, lookback=1 (simulated via 2-row df where the first row is a prior-day lookback).
+        # Only the last window_size=1 row is checked for the IST day — the lookback row is ignored.
+        rows = [
+            (100, 101, 99, 100, 500),   # lookback candle — Day 1
+            (10,  15,  9,  14,  100),   # c1: green — Day 2
+        ]
+        df = make_df_at([_DAY1_LAST, _DAY2_FIRST], rows)
+        compiled = self._compiled("c1.is_green")
+        # window_size=1 so only the Day 2 candle is checked — must match
+        assert run(compiled, df, intraday_only=True) == [df.index[1]]

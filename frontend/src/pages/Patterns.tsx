@@ -70,7 +70,7 @@ export default function Patterns() {
         setPatterns(patterns.map((p) => (p.id === selectedId ? updated : p)));
         toast.success('Pattern updated');
       } else {
-        const created = await createPattern({ ...form, is_active: false, intraday_only: form.intraday_only });
+        const created = await createPattern({ ...form, is_active: false });
         setPatterns([...patterns, created]);
         setSelectedId(created.id);
         toast.success('Pattern created');

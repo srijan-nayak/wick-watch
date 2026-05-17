@@ -2,14 +2,6 @@ from __future__ import annotations
 import math
 import pytz
 import pandas as pd
-
-_IST = pytz.timezone("Asia/Kolkata")
-
-
-def _all_same_ist_day(df: pd.DataFrame, window_size: int) -> bool:
-    """Return True if the last window_size candles all fall on the same IST calendar date."""
-    dates = df.index[-window_size:].tz_convert(_IST).normalize()
-    return dates.nunique() == 1
 from dsl.ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
     CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
@@ -17,9 +9,17 @@ from dsl.ast_nodes import (
 from dsl.compiler import CompiledPattern
 from indicators.registry import INDICATORS
 
+_IST = pytz.timezone("Asia/Kolkata")
+
 
 class EvalError(Exception):
     pass
+
+
+def _all_same_ist_day(df: pd.DataFrame, window_size: int) -> bool:
+    """Return True if the last window_size candles all fall on the same IST calendar date."""
+    dates = df.index[-window_size:].tz_convert(_IST).normalize()
+    return dates.nunique() == 1
 
 
 def run(

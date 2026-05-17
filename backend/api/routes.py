@@ -161,7 +161,7 @@ async def update_pattern(pattern_id: int, data: dict, session: AsyncSession = De
                         log.warning("Could not seed %s/%s for pattern '%s': %s",
                                     ticker.symbol, pattern.interval, pattern.name, exc)
 
-    if stream and "intraday_only" in data and pattern.is_active:
+    if stream and "intraday_only" in data and pattern.is_active and "is_active" not in data:
         stream.set_intraday_only(pattern.name, pattern.intraday_only)
 
     return pattern
