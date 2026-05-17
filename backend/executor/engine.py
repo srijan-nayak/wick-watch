@@ -22,10 +22,19 @@ def _all_same_ist_day(df: pd.DataFrame, window_size: int) -> bool:
     return dates.nunique() == 1
 
 
+def _c1_before_cutoff(df: pd.DataFrame, active_until: str) -> bool:
+    """Return True if c1's IST wall-clock time is strictly before the active_until cutoff."""
+    c1_ist = df.index[-1].tz_convert(_IST)
+    h, m = map(int, active_until.split(":"))
+    cutoff = c1_ist.replace(hour=h, minute=m, second=0, microsecond=0)
+    return c1_ist < cutoff
+
+
 def run(
     compiled: CompiledPattern,
     df: pd.DataFrame,
     intraday_only: bool = True,
+    active_until: str | None = None,
 ) -> list[pd.Timestamp]:
     """
     Slide the pattern window across df and return timestamps of candles (c1)
@@ -53,6 +62,9 @@ def run(
         slice_df = df.iloc[start_idx : end_idx + 1]
 
         if intraday_only and not _all_same_ist_day(slice_df, compiled.window_size):
+            continue
+
+        if active_until and not _c1_before_cutoff(slice_df, active_until):
             continue
 
         try:

@@ -84,8 +84,8 @@ class LiveStream:
         # (instrument_token, interval) → CandleBuffer
         self._buffers: dict[tuple[int, str], CandleBuffer] = {}
 
-        # (instrument_token, interval) → list of (pattern_name, CompiledPattern, intraday_only)
-        self._patterns: dict[tuple[int, str], list[tuple[str, CompiledPattern, bool]]] = defaultdict(list)
+        # (instrument_token, interval) → list of (pattern_name, CompiledPattern, intraday_only, active_until)
+        self._patterns: dict[tuple[int, str], list[tuple[str, CompiledPattern, bool, str | None]]] = defaultdict(list)
 
         # instrument_token → trading symbol (for alert messages)
         self._symbols: dict[int, str] = {}
@@ -105,6 +105,7 @@ class LiveStream:
         compiled: CompiledPattern,
         seed_df: pd.DataFrame,
         intraday_only: bool = True,
+        active_until: str | None = None,
     ) -> None:
         """
         Register a pattern to run against a specific ticker.
@@ -123,7 +124,7 @@ class LiveStream:
                 existing = self._buffers[key]
                 if capacity > existing.capacity:
                     existing.capacity = capacity
-            self._patterns[key].append((pattern_name, compiled, intraday_only))
+            self._patterns[key].append((pattern_name, compiled, intraday_only, active_until))
 
     def has_buffer(self, instrument_token: int, interval: str) -> bool:
         return (instrument_token, interval) in self._buffers
@@ -137,6 +138,7 @@ class LiveStream:
         compiled: CompiledPattern,
         seed_df: pd.DataFrame | None = None,
         intraday_only: bool = True,
+        active_until: str | None = None,
     ) -> bool:
         """Add a pattern to a running stream. Returns False if buffer is missing and no seed_df provided."""
         key = (instrument_token, interval)
@@ -153,7 +155,7 @@ class LiveStream:
                 existing = self._buffers[key]
                 if capacity > existing.capacity:
                     existing.capacity = capacity
-            self._patterns[key].append((pattern_name, compiled, intraday_only))
+            self._patterns[key].append((pattern_name, compiled, intraday_only, active_until))
         return True
 
     def remove_pattern(self, pattern_name: str) -> None:
@@ -161,7 +163,7 @@ class LiveStream:
         with self._lock:
             for key in list(self._patterns.keys()):
                 self._patterns[key] = [
-                    (name, compiled, io) for name, compiled, io in self._patterns[key]
+                    (name, compiled, io, au) for name, compiled, io, au in self._patterns[key]
                     if name != pattern_name
                 ]
 
@@ -170,8 +172,17 @@ class LiveStream:
         with self._lock:
             for key in list(self._patterns.keys()):
                 self._patterns[key] = [
-                    (name, compiled, intraday_only if name == pattern_name else io)
-                    for name, compiled, io in self._patterns[key]
+                    (name, compiled, intraday_only if name == pattern_name else io, au)
+                    for name, compiled, io, au in self._patterns[key]
+                ]
+
+    def set_active_until(self, pattern_name: str, active_until: str | None) -> None:
+        """Update the active_until cutoff for a named pattern without restarting the stream."""
+        with self._lock:
+            for key in list(self._patterns.keys()):
+                self._patterns[key] = [
+                    (name, compiled, io, active_until if name == pattern_name else au)
+                    for name, compiled, io, au in self._patterns[key]
                 ]
 
     def start(self) -> None:
@@ -210,9 +221,9 @@ class LiveStream:
         latest_candle_time = df.index[-1]
         with self._lock:
             patterns = list(self._patterns.get(key, []))
-        for pattern_name, compiled, intraday_only in patterns:
+        for pattern_name, compiled, intraday_only, active_until in patterns:
             try:
-                matches = run(compiled, df, intraday_only=intraday_only)
+                matches = run(compiled, df, intraday_only=intraday_only, active_until=active_until)
                 if matches and matches[-1] == latest_candle_time:
                     symbol = self._symbols.get(token, str(token))
                     if self._on_alert:

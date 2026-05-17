@@ -37,6 +37,7 @@ class Pattern(SQLModel, table=True):
     interval: str  # e.g. "5minute", "15minute"
     is_active: bool = False
     intraday_only: bool = Field(default=True)
+    active_until: Optional[str] = Field(default=None)  # "HH:MM" IST, null = no cutoff
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -81,6 +82,10 @@ async def create_db():
             await conn.execute(text(
                 "ALTER TABLE pattern ADD COLUMN intraday_only BOOLEAN NOT NULL DEFAULT 1"
             ))
+        except Exception:
+            pass  # Column already exists
+        try:
+            await conn.execute(text("ALTER TABLE pattern ADD COLUMN active_until TEXT"))
         except Exception:
             pass  # Column already exists
 

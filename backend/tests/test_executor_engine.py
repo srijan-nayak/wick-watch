@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from dsl.parser import parse
 from dsl.compiler import compile_pattern
-from executor.engine import run, EvalError, _all_same_ist_day
+from executor.engine import run, EvalError, _all_same_ist_day, _c1_before_cutoff
 
 
 # ------------------------------------------------------------------ helpers
@@ -292,3 +292,72 @@ class TestIntradayOnly:
         compiled = self._compiled("c1.is_green")
         # window_size=1 so only the Day 2 candle is checked — must match
         assert run(compiled, df, intraday_only=True) == [df.index[1]]
+
+
+# ------------------------------------------------------------------ active_until
+
+# IST candle times for cutoff tests:
+#   IST 10:00 = UTC 04:30  (before a 11:30 cutoff)
+#   IST 11:30 = UTC 06:00  (equal to cutoff — must be blocked, check is strictly-before)
+#   IST 12:00 = UTC 06:30  (past cutoff)
+_IST_10_00 = "2024-01-02 04:30:00"
+_IST_11_30 = "2024-01-02 06:00:00"
+_IST_12_00 = "2024-01-02 06:30:00"
+
+_GREEN = (10, 15, 9, 14, 100)  # open < close → green
+_RED   = (14, 15, 9, 10, 100)  # open > close → red
+
+
+class TestActiveUntil:
+    def _compiled(self, dsl: str):
+        return compile_pattern(parse(dsl))
+
+    def test_before_cutoff_fires(self):
+        # c1 at IST 10:00, cutoff 11:30 → should match
+        df = make_df_at([_IST_10_00], [_GREEN])
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=False, active_until="11:30") == [df.index[0]]
+
+    def test_at_cutoff_blocked(self):
+        # c1 exactly at IST 11:30 → strictly-before fails → no match
+        df = make_df_at([_IST_11_30], [_GREEN])
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=False, active_until="11:30") == []
+
+    def test_after_cutoff_blocked(self):
+        # c1 at IST 12:00, past cutoff 11:30 → no match
+        df = make_df_at([_IST_12_00], [_GREEN])
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=False, active_until="11:30") == []
+
+    def test_no_cutoff_always_fires(self):
+        # active_until=None → no filtering regardless of time
+        df = make_df_at([_IST_12_00], [_GREEN])
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=False, active_until=None) == [df.index[0]]
+
+    def test_multiple_candles_only_before_cutoff_match(self):
+        # Three candles: before, at, after cutoff — only the first fires
+        df = make_df_at([_IST_10_00, _IST_11_30, _IST_12_00], [_GREEN, _GREEN, _GREEN])
+        compiled = self._compiled("c1.is_green")
+        matches = run(compiled, df, intraday_only=False, active_until="11:30")
+        assert matches == [df.index[0]]
+
+    def test_c1_before_cutoff_helper_before(self):
+        df = make_df_at([_IST_10_00], [_GREEN])
+        assert _c1_before_cutoff(df, "11:30") is True
+
+    def test_c1_before_cutoff_helper_at(self):
+        df = make_df_at([_IST_11_30], [_GREEN])
+        assert _c1_before_cutoff(df, "11:30") is False
+
+    def test_c1_before_cutoff_helper_after(self):
+        df = make_df_at([_IST_12_00], [_GREEN])
+        assert _c1_before_cutoff(df, "11:30") is False
+
+    def test_active_until_and_intraday_only_both_independent(self):
+        # Cross-day AND past cutoff: both guards fire independently.
+        # A same-day candle past cutoff should be blocked by active_until even if intraday_only passes.
+        df = make_df_at([_IST_12_00], [_GREEN])
+        compiled = self._compiled("c1.is_green")
+        assert run(compiled, df, intraday_only=True, active_until="11:30") == []

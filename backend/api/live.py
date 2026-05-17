@@ -246,6 +246,7 @@ async def start_live(session: AsyncSession = Depends(get_session)):
                         compiled=compiled,
                         seed_df=seed_df,
                         intraday_only=pattern.intraday_only,
+                        active_until=pattern.active_until,
                     )
                 seeded += 1
 

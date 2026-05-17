@@ -22,7 +22,7 @@ const INTERVALS = [
   { value: '60minute', label: '60 min' },
 ];
 
-const EMPTY_FORM = { name: '', dsl: '', interval: 'minute', intraday_only: true };
+const EMPTY_FORM = { name: '', dsl: '', interval: 'minute', intraday_only: true, active_until: '' };
 
 export default function Patterns() {
   const patterns    = useStore((s) => s.patterns);
@@ -50,7 +50,7 @@ export default function Patterns() {
 
   const selectPattern = (p: Pattern) => {
     setSelectedId(p.id);
-    setForm({ name: p.name, dsl: p.dsl, interval: p.interval, intraday_only: p.intraday_only });
+    setForm({ name: p.name, dsl: p.dsl, interval: p.interval, intraday_only: p.intraday_only, active_until: p.active_until ?? '' });
   };
 
   const newPattern = () => {
@@ -65,12 +65,14 @@ export default function Patterns() {
     try {
       if (selectedId !== null) {
         const updated = await updatePattern(selectedId, {
-          name: form.name, dsl: form.dsl, interval: form.interval, intraday_only: form.intraday_only,
+          name: form.name, dsl: form.dsl, interval: form.interval,
+          intraday_only: form.intraday_only,
+          active_until: form.active_until || null,
         });
         setPatterns(patterns.map((p) => (p.id === selectedId ? updated : p)));
         toast.success('Pattern updated');
       } else {
-        const created = await createPattern({ ...form, is_active: false });
+        const created = await createPattern({ ...form, is_active: false, active_until: form.active_until || null });
         setPatterns([...patterns, created]);
         setSelectedId(created.id);
         toast.success('Pattern created');
@@ -144,6 +146,9 @@ export default function Patterns() {
               <div style={styles.patternMeta}>
                 <span style={styles.patternName}>{p.name}</span>
                 <span style={styles.intervalBadge}>{p.interval}</span>
+                {p.active_until && (
+                  <span style={styles.cutoffBadge}>until {p.active_until}</span>
+                )}
               </div>
               <div style={styles.patternActions}>
                 <button
@@ -215,6 +220,21 @@ export default function Patterns() {
             {form.intraday_only
               ? 'c1, c2, c3… are restricted to the current trading day. The pattern will not fire across day boundaries.'
               : 'c1, c2, c3… can span multiple trading days.'}
+          </p>
+        </div>
+
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Active until (IST)</label>
+          <input
+            type="time"
+            style={styles.input}
+            value={form.active_until}
+            onChange={(e) => setForm((f) => ({ ...f, active_until: e.target.value }))}
+          />
+          <p style={styles.dslHint}>
+            {form.active_until
+              ? `Pattern won't fire at or after ${form.active_until} IST.`
+              : 'No cutoff — pattern runs all day. Set a time to limit detection to the morning session, etc.'}
           </p>
         </div>
 
@@ -329,6 +349,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2px 6px',
     borderRadius: 4,
     border: '1px solid var(--interval-border)',
+    whiteSpace: 'nowrap',
+  },
+  cutoffBadge: {
+    fontSize: 10,
+    background: 'var(--accent-bg)',
+    color: 'var(--accent)',
+    padding: '2px 6px',
+    borderRadius: 4,
+    border: '1px solid var(--accent-border)',
     whiteSpace: 'nowrap',
   },
   patternActions: {

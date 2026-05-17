@@ -64,7 +64,7 @@ async def run_backtest(
     except Exception as exc:
         raise HTTPException(502, f"Kite historical data error: {exc}")
 
-    match_timestamps = run(compiled, df, intraday_only=pattern.intraday_only)
+    match_timestamps = run(compiled, df, intraday_only=pattern.intraday_only, active_until=pattern.active_until)
     match_set = set(match_timestamps)
 
     candles = [
