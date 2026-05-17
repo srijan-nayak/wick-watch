@@ -236,14 +236,13 @@ export default function DslEditor({ value, onChange, indicators, readOnly }: Dsl
         const model = editorRef.current?.getModel();
         if (!model) return;
 
-        const trimmed = dsl.trim();
-        if (!trimmed) {
+        if (!dsl.trim()) {
           monaco.editor.setModelMarkers(model, LINT_OWNER, []);
           return;
         }
 
         try {
-          const result = await validateDsl(trimmed);
+          const result = await validateDsl(dsl);
           if (result.ok) {
             monaco.editor.setModelMarkers(model, LINT_OWNER, []);
           } else {

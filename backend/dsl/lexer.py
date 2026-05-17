@@ -95,6 +95,6 @@ def tokenize(source: str) -> list[Token]:
     for i, ch in enumerate(source):
         if i not in matched_positions and ch not in ("\r",):
             col = i - source.rfind("\n", 0, i)
-            raise LexError(f"Unexpected character {ch!r} at line {source[:i].count(chr(10)) + 1}:{col}")
+            raise LexError(f"Line {source[:i].count(chr(10)) + 1}:{col} — unexpected character {ch!r}")
 
     return tokens

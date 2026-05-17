@@ -43,11 +43,10 @@ def _parse_location(msg: str) -> tuple[int, int]:
 
 @router.post("/dsl/validate", response_model=ValidateDslResponse)
 async def validate_dsl(req: ValidateDslRequest):
-    dsl = req.dsl.strip()
-    if not dsl:
+    if not req.dsl.strip():
         return ValidateDslResponse(ok=True)
     try:
-        ast = parse(dsl)
+        ast = parse(req.dsl)
         validate(ast)
         return ValidateDslResponse(ok=True)
     except (ParseError, LexError) as exc:
