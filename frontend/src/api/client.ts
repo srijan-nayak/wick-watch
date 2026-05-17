@@ -13,6 +13,7 @@ export interface Pattern {
   dsl: string;
   interval: string;
   is_active: boolean;
+  intraday_only: boolean;
 }
 
 export interface Ticker {
@@ -141,6 +142,7 @@ export const createPattern = (body: {
   dsl: string;
   interval: string;
   is_active: boolean;
+  intraday_only: boolean;
 }) => request<Pattern>('/api/patterns', { method: 'POST', body: JSON.stringify(body) });
 
 export const updatePattern = (

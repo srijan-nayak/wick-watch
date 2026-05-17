@@ -135,6 +135,7 @@ async def update_pattern(pattern_id: int, data: dict, session: AsyncSession = De
                         interval=pattern.interval,
                         pattern_name=pattern.name,
                         compiled=compiled,
+                        intraday_only=pattern.intraday_only,
                     )
                 else:
                     try:
@@ -154,10 +155,14 @@ async def update_pattern(pattern_id: int, data: dict, session: AsyncSession = De
                             pattern_name=pattern.name,
                             compiled=compiled,
                             seed_df=seed_df,
+                            intraday_only=pattern.intraday_only,
                         )
                     except Exception as exc:
                         log.warning("Could not seed %s/%s for pattern '%s': %s",
                                     ticker.symbol, pattern.interval, pattern.name, exc)
+
+    if stream and "intraday_only" in data and pattern.is_active:
+        stream.set_intraday_only(pattern.name, pattern.intraday_only)
 
     return pattern
 

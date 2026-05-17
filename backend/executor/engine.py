@@ -1,6 +1,15 @@
 from __future__ import annotations
 import math
+import pytz
 import pandas as pd
+
+_IST = pytz.timezone("Asia/Kolkata")
+
+
+def _all_same_ist_day(df: pd.DataFrame, window_size: int) -> bool:
+    """Return True if the last window_size candles all fall on the same IST calendar date."""
+    dates = df.index[-window_size:].tz_convert(_IST).normalize()
+    return dates.nunique() == 1
 from dsl.ast_nodes import (
     PatternAST, BoolNode, BoolProp, Comparison, LogicalAnd, LogicalOr,
     CandleField, IndicatorCall, NumberLiteral, BinaryArith, ValueNode,
@@ -13,7 +22,11 @@ class EvalError(Exception):
     pass
 
 
-def run(compiled: CompiledPattern, df: pd.DataFrame) -> list[pd.Timestamp]:
+def run(
+    compiled: CompiledPattern,
+    df: pd.DataFrame,
+    intraday_only: bool = True,
+) -> list[pd.Timestamp]:
     """
     Slide the pattern window across df and return timestamps of candles (c1)
     where the pattern matched.
@@ -23,6 +36,10 @@ def run(compiled: CompiledPattern, df: pd.DataFrame) -> list[pd.Timestamp]:
 
     Extra lookback candles must already be included in df — the caller is
     responsible for fetching window_size + lookback rows.
+
+    When intraday_only=True, windows where any of the c1..cN candles span
+    more than one IST calendar day are skipped. Lookback candles (used only
+    for indicator warmup) are unaffected by this check.
     """
     required = compiled.window_size + compiled.lookback
     if len(df) < required:
@@ -34,6 +51,9 @@ def run(compiled: CompiledPattern, df: pd.DataFrame) -> list[pd.Timestamp]:
     for end_idx in range(required - 1, len(df)):
         start_idx = end_idx - required + 1
         slice_df = df.iloc[start_idx : end_idx + 1]
+
+        if intraday_only and not _all_same_ist_day(slice_df, compiled.window_size):
+            continue
 
         try:
             if _eval_pattern(compiled.ast, slice_df, compiled.window_size):

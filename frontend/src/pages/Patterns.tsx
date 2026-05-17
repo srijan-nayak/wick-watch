@@ -22,7 +22,7 @@ const INTERVALS = [
   { value: '60minute', label: '60 min' },
 ];
 
-const EMPTY_FORM = { name: '', dsl: '', interval: 'minute' };
+const EMPTY_FORM = { name: '', dsl: '', interval: 'minute', intraday_only: true };
 
 export default function Patterns() {
   const patterns    = useStore((s) => s.patterns);
@@ -50,7 +50,7 @@ export default function Patterns() {
 
   const selectPattern = (p: Pattern) => {
     setSelectedId(p.id);
-    setForm({ name: p.name, dsl: p.dsl, interval: p.interval });
+    setForm({ name: p.name, dsl: p.dsl, interval: p.interval, intraday_only: p.intraday_only });
   };
 
   const newPattern = () => {
@@ -65,12 +65,12 @@ export default function Patterns() {
     try {
       if (selectedId !== null) {
         const updated = await updatePattern(selectedId, {
-          name: form.name, dsl: form.dsl, interval: form.interval,
+          name: form.name, dsl: form.dsl, interval: form.interval, intraday_only: form.intraday_only,
         });
         setPatterns(patterns.map((p) => (p.id === selectedId ? updated : p)));
         toast.success('Pattern updated');
       } else {
-        const created = await createPattern({ ...form, is_active: false });
+        const created = await createPattern({ ...form, is_active: false, intraday_only: form.intraday_only });
         setPatterns([...patterns, created]);
         setSelectedId(created.id);
         toast.success('Pattern created');
@@ -196,6 +196,26 @@ export default function Patterns() {
               <option key={iv.value} value={iv.value}>{iv.label}</option>
             ))}
           </select>
+        </div>
+
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Candle Scope</label>
+          <button
+            type="button"
+            style={{
+              ...styles.scopeToggle,
+              ...(form.intraday_only ? styles.scopeToggleOn : styles.scopeToggleOff),
+            }}
+            onClick={() => setForm((f) => ({ ...f, intraday_only: !f.intraday_only }))}
+            title="When on, c1/c2/c3… are restricted to the current trading day only"
+          >
+            {form.intraday_only ? 'Today only' : 'All days'}
+          </button>
+          <p style={styles.dslHint}>
+            {form.intraday_only
+              ? 'c1, c2, c3… are restricted to the current trading day. The pattern will not fire across day boundaries.'
+              : 'c1, c2, c3… can span multiple trading days.'}
+          </p>
         </div>
 
         <div style={styles.formGroup}>
@@ -401,5 +421,25 @@ const styles: Record<string, React.CSSProperties> = {
   saveBtnDisabled: {
     opacity: 0.6,
     cursor: 'not-allowed',
+  },
+  scopeToggle: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    fontWeight: 600,
+    padding: '6px 14px',
+    borderRadius: 6,
+    cursor: 'pointer',
+    border: '1px solid var(--border-mid)',
+    letterSpacing: '0.04em',
+    transition: 'background 0.12s, color 0.12s',
+  },
+  scopeToggleOn: {
+    background: 'var(--accent-bg)',
+    border: '1px solid var(--accent-border)',
+    color: 'var(--accent)',
+  },
+  scopeToggleOff: {
+    background: 'transparent',
+    color: 'var(--text-disabled)',
   },
 };

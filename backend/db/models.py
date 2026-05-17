@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import Field, SQLModel, create_engine, Session
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -35,6 +36,7 @@ class Pattern(SQLModel, table=True):
     dsl: str
     interval: str  # e.g. "5minute", "15minute"
     is_active: bool = False
+    intraday_only: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -74,6 +76,13 @@ class PatternMatch(SQLModel, table=True):
 async def create_db():
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+        # One-shot migration: add intraday_only to existing pattern tables that predate this column.
+        try:
+            await conn.execute(text(
+                "ALTER TABLE pattern ADD COLUMN intraday_only BOOLEAN NOT NULL DEFAULT 1"
+            ))
+        except Exception:
+            pass  # Column already exists
 
 
 async def get_session():
